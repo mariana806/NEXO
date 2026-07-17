@@ -117,3 +117,573 @@
 
   <div id="fijos" class="panel">
     <div class="card">
+      <div class="grid2">
+        <div><label>Nombre</label><input id="f-name" placeholder="Renta, luz, agua..."></div>
+        <div><label>Categoría</label><select id="f-cat"></select></div>
+      </div>
+      <div class="grid2">
+        <div><label>Monto</label><input id="f-amount" type="number" step="0.01" placeholder="0"></div>
+        <div><label>Día de vencimiento (1-31)</label><input id="f-day" type="number" min="1" max="31" placeholder="15"></div>
+      </div>
+      <div class="actions">
+        <button id="f-submit" onclick="submitFixed()">Agregar gasto fijo</button>
+        <button class="ghost" id="f-cancel" style="display:none;" onclick="cancelEditFixed()">Cancelar</button>
+      </div>
+    </div>
+    <div class="section-title">Lista de gastos fijos</div>
+    <div id="fixed-list"></div>
+  </div>
+
+  <div id="diarios" class="panel">
+    <div class="card">
+      <div class="grid2">
+        <div><label>Fecha</label><input id="d-date" type="date"></div>
+        <div><label>Categoría</label><select id="d-cat"></select></div>
+      </div>
+      <div class="grid2">
+        <div><label>Monto</label><input id="d-amount" type="number" step="0.01" placeholder="0"></div>
+        <div><label>Nota (opcional)</label><input id="d-note" placeholder="detalle"></div>
+      </div>
+      <div class="actions">
+        <button id="d-submit" onclick="submitDaily()">Agregar gasto diario</button>
+        <button class="ghost" id="d-cancel" style="display:none;" onclick="cancelEditDaily()">Cancelar</button>
+      </div>
+    </div>
+    <div class="section-title">Gastos diarios registrados</div>
+    <div id="daily-list"></div>
+  </div>
+
+  <div id="ingresos" class="panel">
+    <div class="card">
+      <div class="grid2">
+        <div><label>Fecha</label><input id="i-date" type="date"></div>
+        <div><label>Monto</label><input id="i-amount" type="number" step="0.01" placeholder="0"></div>
+      </div>
+      <label>Nota (opcional)</label><input id="i-note" placeholder="fuente del ingreso">
+      <div class="actions">
+        <button id="i-submit" onclick="submitIncome()">Agregar ingreso</button>
+        <button class="ghost" id="i-cancel" style="display:none;" onclick="cancelEditIncome()">Cancelar</button>
+      </div>
+    </div>
+    <div class="section-title">Ingresos registrados</div>
+    <div id="income-list"></div>
+  </div>
+
+  <div id="dias" class="panel">
+    <p class="sub" style="margin-top:0;">Lo que ganaste y gastaste cada día</p>
+    <div id="daily-summary-list"></div>
+  </div>
+
+  <div id="ahorros" class="panel">
+    <div class="card">
+      <div class="grid2">
+        <div><label>Categoría de ahorro</label><input id="s-name" placeholder="Emergencias, viaje..."></div>
+        <div><label>Meta</label><input id="s-goal" type="number" step="0.01" placeholder="0"></div>
+      </div>
+      <button onclick="addSaving()">Crear categoría de ahorro</button>
+    </div>
+    <div class="section-title">Categorías de ahorro</div>
+    <div id="savings-list"></div>
+  </div>
+
+  <div id="tarjetas" class="panel">
+    <div class="card">
+      <div class="grid2">
+        <div><label>Nombre de la tarjeta</label><input id="c-name" placeholder="Tarjeta 1"></div>
+        <div><label>Monto a pagar</label><input id="c-amount" type="number" step="0.01" placeholder="0"></div>
+      </div>
+      <label>Día límite de pago (1-31)</label><input id="c-day" type="number" min="1" max="31" placeholder="20">
+      <div class="actions">
+        <button id="c-submit" onclick="submitCard()">Agregar tarjeta</button>
+        <button class="ghost" id="c-cancel" style="display:none;" onclick="cancelEditCard()">Cancelar</button>
+      </div>
+    </div>
+    <div class="section-title">Tarjetas de crédito</div>
+    <div id="cards-list"></div>
+  </div>
+
+  <div id="ajustes" class="panel">
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Categorías</div>
+      <div id="cat-tags"></div>
+      <label>Nueva categoría</label>
+      <input id="new-cat" placeholder="Ej: Educación">
+      <button onclick="addCategory()">Agregar categoría</button>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Cambiar PIN</div>
+      <label>Nuevo PIN</label>
+      <input id="new-pin" type="password" inputmode="numeric" placeholder="4 a 6 números">
+      <button onclick="changePin()">Guardar PIN</button>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Copia de seguridad</div>
+      <p class="sub">Descarga tus datos por si acaso, o restáuralos desde un archivo guardado antes.</p>
+      <div class="actions">
+        <button onclick="downloadBackup()">Descargar copia</button>
+        <button class="ghost" onclick="document.getElementById('restore-file').click()">Restaurar copia</button>
+      </div>
+      <input type="file" id="restore-file" accept="application/json" style="display:none;" onchange="restoreBackup(event)">
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://nalmayvmhqhvqjbudvhs.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_FJRYij_qsHEftI5AyEPIuw_3m7gH6m8';
+const ROW_ID = 'principal';
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const DEFAULT_CATS = ['Comida','Transporte','Servicios','Salud','Vivienda','Otros'];
+let data = { fixed: [], daily: [], income: [], savings: [], cards: [], foodBudget: 0, categories: DEFAULT_CATS.slice(), pin: '' };
+let editingFixedId = null, editingDailyId = null, editingIncomeId = null, editingCardId = null;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function money(n){ return '$' + Number(n||0).toLocaleString('es-PA', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function currentMonth(){ return new Date().toISOString().slice(0,7); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showStatus(msg, type){
+  const bar = document.getElementById('status-bar');
+  bar.textContent = msg;
+  bar.className = 'show' + (type ? ' '+type : '');
+  if(type !== 'error'){
+    setTimeout(()=>{ bar.classList.remove('show'); }, 1800);
+  }
+}
+
+async function loadData(){
+  showStatus('Cargando datos...', '');
+  try{
+    const { data: rows, error } = await supa.from('finanzas').select('data').eq('id', ROW_ID).single();
+    if(error) throw error;
+    if(rows && rows.data){
+      data = Object.assign({ fixed: [], daily: [], income: [], savings: [], cards: [], foodBudget: 0, categories: DEFAULT_CATS.slice(), pin: '' }, rows.data);
+    }
+    showStatus('Datos cargados', 'ok');
+  }catch(e){
+    console.error(e);
+    showStatus('No se pudo conectar. Revisa tu internet o la configuración.', 'error');
+  }
+  initLock();
+  render();
+}
+
+async function saveData(){
+  showStatus('Guardando...', '');
+  try{
+    const { error } = await supa.from('finanzas').update({ data, updated_at: new Date().toISOString() }).eq('id', ROW_ID);
+    if(error) throw error;
+    showStatus('Guardado', 'ok');
+  }catch(e){
+    console.error(e);
+    showStatus('No se pudo guardar. Intenta de nuevo.', 'error');
+  }
+}
+
+function initLock(){
+  const lockScreen = document.getElementById('lock-screen');
+  const lockText = document.getElementById('lock-text');
+  const unlocked = sessionStorage.getItem('unlocked') === '1';
+  if(!data.pin){
+    lockText.textContent = 'Crea un PIN para proteger tus datos (4 a 6 números)';
+  }
+  if(unlocked && data.pin){
+    lockScreen.style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+  }
+}
+async function handleLock(){
+  const val = document.getElementById('lock-input').value.trim();
+  const err = document.getElementById('lock-error');
+  if(!data.pin){
+    if(val.length < 4){ err.textContent = 'El PIN debe tener al menos 4 números.'; return; }
+    data.pin = val;
+    await saveData();
+    sessionStorage.setItem('unlocked','1');
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+    return;
+  }
+  if(val === data.pin){
+    sessionStorage.setItem('unlocked','1');
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+  }else{
+    err.textContent = 'PIN incorrecto.';
+  }
+}
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.tab).classList.add('active');
+  });
+});
+
+function fillCategorySelects(){
+  ['f-cat','d-cat'].forEach(id=>{
+    const sel = document.getElementById(id);
+    const current = sel.value;
+    sel.innerHTML = data.categories.map(c=>'<option>'+escapeHtml(c)+'</option>').join('');
+    if(data.categories.includes(current)) sel.value = current;
+  });
+}
+
+function addCategory(){
+  const val = document.getElementById('new-cat').value.trim();
+  if(!val || data.categories.includes(val)) return;
+  data.categories.push(val);
+  document.getElementById('new-cat').value = '';
+  saveData(); render();
+}
+function deleteCategory(cat){
+  data.categories = data.categories.filter(c=>c!==cat);
+  saveData(); render();
+}
+
+function changePin(){
+  const val = document.getElementById('new-pin').value.trim();
+  if(val.length < 4){ alert('El PIN debe tener al menos 4 números.'); return; }
+  data.pin = val;
+  document.getElementById('new-pin').value = '';
+  saveData();
+  alert('PIN actualizado.');
+}
+
+function downloadBackup(){
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'contabilidad-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function restoreBackup(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const parsed = JSON.parse(reader.result);
+      data = Object.assign({ fixed: [], daily: [], income: [], savings: [], cards: [], foodBudget: 0, categories: DEFAULT_CATS.slice(), pin: data.pin }, parsed);
+      saveData(); render();
+      alert('Copia restaurada.');
+    }catch(e){ alert('Ese archivo no es una copia válida.'); }
+  };
+  reader.readAsText(file);
+}
+
+function submitFixed(){
+  const name=document.getElementById('f-name').value.trim();
+  const amount=parseFloat(document.getElementById('f-amount').value);
+  const day=parseInt(document.getElementById('f-day').value);
+  const category=document.getElementById('f-cat').value;
+  if(!name||!amount) return;
+  if(editingFixedId){
+    const it = data.fixed.find(x=>x.id===editingFixedId);
+    Object.assign(it, {name, category, amount, day: day||1});
+    cancelEditFixed();
+  }else{
+    data.fixed.push({id:uid(), name, category, amount, day: day||1, paid:false});
+  }
+  document.getElementById('f-name').value='';
+  document.getElementById('f-amount').value='';
+  document.getElementById('f-day').value='';
+  saveData(); render();
+}
+function editFixed(id){
+  const it = data.fixed.find(x=>x.id===id); if(!it) return;
+  editingFixedId = id;
+  document.getElementById('f-name').value = it.name;
+  document.getElementById('f-cat').value = it.category;
+  document.getElementById('f-amount').value = it.amount;
+  document.getElementById('f-day').value = it.day;
+  document.getElementById('f-submit').textContent = 'Guardar cambios';
+  document.getElementById('f-cancel').style.display = 'inline-block';
+  document.getElementById('fijos').scrollIntoView({behavior:'smooth'});
+}
+function cancelEditFixed(){
+  editingFixedId = null;
+  document.getElementById('f-submit').textContent = 'Agregar gasto fijo';
+  document.getElementById('f-cancel').style.display = 'none';
+}
+function toggleFixedPaid(id){
+  const it = data.fixed.find(x=>x.id===id); if(it) it.paid=!it.paid;
+  saveData(); render();
+}
+function deleteFixed(id){
+  if(!confirm('¿Borrar este gasto fijo?')) return;
+  data.fixed = data.fixed.filter(x=>x.id!==id);
+  saveData(); render();
+}
+
+function submitDaily(){
+  const date=document.getElementById('d-date').value || new Date().toISOString().slice(0,10);
+  const category=document.getElementById('d-cat').value;
+  const amount=parseFloat(document.getElementById('d-amount').value);
+  const note=document.getElementById('d-note').value.trim();
+  if(!amount) return;
+  if(editingDailyId){
+    const it = data.daily.find(x=>x.id===editingDailyId);
+    Object.assign(it, {date, category, amount, note});
+    cancelEditDaily();
+  }else{
+    data.daily.push({id:uid(), date, category, amount, note});
+  }
+  document.getElementById('d-amount').value='';
+  document.getElementById('d-note').value='';
+  saveData(); render();
+}
+function editDaily(id){
+  const it = data.daily.find(x=>x.id===id); if(!it) return;
+  editingDailyId = id;
+  document.getElementById('d-date').value = it.date;
+  document.getElementById('d-cat').value = it.category;
+  document.getElementById('d-amount').value = it.amount;
+  document.getElementById('d-note').value = it.note;
+  document.getElementById('d-submit').textContent = 'Guardar cambios';
+  document.getElementById('d-cancel').style.display = 'inline-block';
+  document.getElementById('diarios').scrollIntoView({behavior:'smooth'});
+}
+function cancelEditDaily(){
+  editingDailyId = null;
+  document.getElementById('d-submit').textContent = 'Agregar gasto diario';
+  document.getElementById('d-cancel').style.display = 'none';
+}
+function deleteDaily(id){
+  if(!confirm('¿Borrar este gasto?')) return;
+  data.daily = data.daily.filter(x=>x.id!==id);
+  saveData(); render();
+}
+
+function submitIncome(){
+  const date=document.getElementById('i-date').value || new Date().toISOString().slice(0,10);
+  const amount=parseFloat(document.getElementById('i-amount').value);
+  const note=document.getElementById('i-note').value.trim();
+  if(!amount) return;
+  if(editingIncomeId){
+    const it = data.income.find(x=>x.id===editingIncomeId);
+    Object.assign(it, {date, amount, note});
+    cancelEditIncome();
+  }else{
+    data.income.push({id:uid(), date, amount, note});
+  }
+  document.getElementById('i-amount').value='';
+  document.getElementById('i-note').value='';
+  saveData(); render();
+}
+function editIncome(id){
+  const it = data.income.find(x=>x.id===id); if(!it) return;
+  editingIncomeId = id;
+  document.getElementById('i-date').value = it.date;
+  document.getElementById('i-amount').value = it.amount;
+  document.getElementById('i-note').value = it.note;
+  document.getElementById('i-submit').textContent = 'Guardar cambios';
+  document.getElementById('i-cancel').style.display = 'inline-block';
+  document.getElementById('ingresos').scrollIntoView({behavior:'smooth'});
+}
+function cancelEditIncome(){
+  editingIncomeId = null;
+  document.getElementById('i-submit').textContent = 'Agregar ingreso';
+  document.getElementById('i-cancel').style.display = 'none';
+}
+function deleteIncome(id){
+  if(!confirm('¿Borrar este ingreso?')) return;
+  data.income = data.income.filter(x=>x.id!==id);
+  saveData(); render();
+}
+
+function addSaving(){
+  const name=document.getElementById('s-name').value.trim();
+  const goal=parseFloat(document.getElementById('s-goal').value)||0;
+  if(!name) return;
+  data.savings.push({id:uid(), name, goal, current:0});
+  document.getElementById('s-name').value='';
+  document.getElementById('s-goal').value='';
+  saveData(); render();
+}
+function depositSaving(id){
+  const amt = parseFloat(prompt('¿Cuánto quieres agregar a este ahorro?'));
+  if(!amt) return;
+  const it = data.savings.find(x=>x.id===id); if(it) it.current += amt;
+  saveData(); render();
+}
+function editSavingGoal(id){
+  const it = data.savings.find(x=>x.id===id); if(!it) return;
+  const val = parseFloat(prompt('Nueva meta para '+it.name, it.goal));
+  if(isNaN(val)) return;
+  it.goal = val;
+  saveData(); render();
+}
+function deleteSaving(id){
+  if(!confirm('¿Borrar esta categoría de ahorro?')) return;
+  data.savings = data.savings.filter(x=>x.id!==id);
+  saveData(); render();
+}
+
+function submitCard(){
+  const name=document.getElementById('c-name').value.trim();
+  const amount=parseFloat(document.getElementById('c-amount').value);
+  const day=parseInt(document.getElementById('c-day').value);
+  if(!name||!amount) return;
+  if(editingCardId){
+    const it = data.cards.find(x=>x.id===editingCardId);
+    Object.assign(it, {name, amount, day: day||1});
+    cancelEditCard();
+  }else{
+    data.cards.push({id:uid(), name, amount, day: day||1, paid:false});
+  }
+  document.getElementById('c-name').value='';
+  document.getElementById('c-amount').value='';
+  document.getElementById('c-day').value='';
+  saveData(); render();
+}
+function editCard(id){
+  const it = data.cards.find(x=>x.id===id); if(!it) return;
+  editingCardId = id;
+  document.getElementById('c-name').value = it.name;
+  document.getElementById('c-amount').value = it.amount;
+  document.getElementById('c-day').value = it.day;
+  document.getElementById('c-submit').textContent = 'Guardar cambios';
+  document.getElementById('c-cancel').style.display = 'inline-block';
+  document.getElementById('tarjetas').scrollIntoView({behavior:'smooth'});
+}
+function cancelEditCard(){
+  editingCardId = null;
+  document.getElementById('c-submit').textContent = 'Agregar tarjeta';
+  document.getElementById('c-cancel').style.display = 'none';
+}
+function toggleCardPaid(id){
+  const it = data.cards.find(x=>x.id===id); if(it) it.paid=!it.paid;
+  saveData(); render();
+}
+function deleteCard(id){
+  if(!confirm('¿Borrar esta tarjeta?')) return;
+  data.cards = data.cards.filter(x=>x.id!==id);
+  saveData(); render();
+}
+
+function setFoodBudget(){
+  const v = parseFloat(document.getElementById('food-budget-input').value);
+  if(isNaN(v)) return;
+  data.foodBudget = v;
+  saveData(); render();
+}
+
+function render(){
+  fillCategorySelects();
+  const month = currentMonth();
+  const dailyThisMonth = data.daily.filter(x=>x.date && x.date.slice(0,7)===month);
+  const incomeThisMonth = data.income.filter(x=>x.date && x.date.slice(0,7)===month);
+
+  const totalDaily = dailyThisMonth.reduce((s,x)=>s+x.amount,0);
+  const totalFixed = data.fixed.reduce((s,x)=>s+x.amount,0);
+  const totalCards = data.cards.reduce((s,x)=>s+x.amount,0);
+  const totalGastos = totalDaily + totalFixed + totalCards;
+  const totalIngresos = incomeThisMonth.reduce((s,x)=>s+x.amount,0);
+  const balance = totalIngresos - totalGastos;
+
+  document.getElementById('stat-ingresos').textContent = money(totalIngresos);
+  document.getElementById('stat-gastos').textContent = money(totalGastos);
+  document.getElementById('stat-balance').textContent = money(balance);
+  document.getElementById('stat-balance').style.color = balance>=0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('stat-alcanza').innerHTML = balance>=0
+    ? '<span class="alcanza-yes">Sí alcanza</span> con los ingresos registrados este mes'
+    : '<span class="alcanza-no">No alcanza</span> — faltan ' + money(Math.abs(balance));
+
+  const foodSpent = dailyThisMonth.filter(x=>x.category==='Comida').reduce((s,x)=>s+x.amount,0);
+  const budget = data.foodBudget||0;
+  const pct = budget>0 ? Math.min(100,(foodSpent/budget)*100) : 0;
+  document.getElementById('food-bar').style.width = pct+'%';
+  document.getElementById('food-bar').className = 'progress-inner' + (foodSpent>budget && budget>0 ? ' over' : '');
+  document.getElementById('food-text').textContent = budget>0 ? (money(foodSpent)+' de '+money(budget)) : (money(foodSpent)+' gastado (sin presupuesto)');
+  document.getElementById('food-budget-input').value = budget || '';
+
+  const pendList = document.getElementById('pendientes-list');
+  const pendItems = [
+    ...data.fixed.filter(x=>!x.paid).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'fijo'})),
+    ...data.cards.filter(x=>!x.paid).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'tarjeta'}))
+  ].sort((a,b)=>a.day-b.day);
+  pendList.innerHTML = pendItems.length ? pendItems.map(x=>
+    '<div class="row"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+' · '+x.type+'</div></div><div class="amount">'+money(x.amount)+'</div></div>'
+  ).join('') : '<div class="empty">No hay pagos pendientes.</div>';
+
+  document.getElementById('fixed-list').innerHTML = data.fixed.length ? data.fixed.slice().sort((a,b)=>a.day-b.day).map(x=>
+    '<div class="row '+(x.paid?'paid':'')+'"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="name" style="margin-top:4px;">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+'</div></div>'+
+    '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
+    (x.paid?'<span class="stamp">Pagado</span>':'')+
+    '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(x.paid?'checked':'')+' onchange="toggleFixedPaid(\''+x.id+'\')">Pagado</label>'+
+    '<button class="ghost" onclick="editFixed(\''+x.id+'\')">Editar</button>'+
+    '<button class="secondary" onclick="deleteFixed(\''+x.id+'\')">Borrar</button></div></div>'
+  ).join('') : '<div class="empty">Aún no hay gastos fijos.</div>';
+
+  document.getElementById('daily-list').innerHTML = data.daily.length ? data.daily.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>
+    '<div class="row"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="meta">'+x.date+(x.note?' · '+escapeHtml(x.note):'')+'</div></div>'+
+    '<div class="actions"><div class="amount">'+money(x.amount)+'</div><button class="ghost" onclick="editDaily(\''+x.id+'\')">Editar</button><button class="secondary" onclick="deleteDaily(\''+x.id+'\')">Borrar</button></div></div>'
+  ).join('') : '<div class="empty">Aún no hay gastos diarios.</div>';
+
+  document.getElementById('income-list').innerHTML = data.income.length ? data.income.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>
+    '<div class="row"><div class="info"><div class="meta">'+x.date+(x.note?' · '+escapeHtml(x.note):'')+'</div></div>'+
+    '<div class="actions"><div class="amount">'+money(x.amount)+'</div><button class="ghost" onclick="editIncome(\''+x.id+'\')">Editar</button><button class="secondary" onclick="deleteIncome(\''+x.id+'\')">Borrar</button></div></div>'
+  ).join('') : '<div class="empty">Aún no hay ingresos registrados.</div>';
+
+  const byDate = {};
+  data.daily.forEach(x=>{
+    if(!byDate[x.date]) byDate[x.date] = {gasto:0, ingreso:0};
+    byDate[x.date].gasto += x.amount;
+  });
+  data.income.forEach(x=>{
+    if(!byDate[x.date]) byDate[x.date] = {gasto:0, ingreso:0};
+    byDate[x.date].ingreso += x.amount;
+  });
+  const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  document.getElementById('daily-summary-list').innerHTML = dates.length ? dates.map(dt=>{
+    const d = byDate[dt];
+    const bal = d.ingreso - d.gasto;
+    return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;">'+
+      '<span class="name">'+dt+'</span>'+
+      '<span style="font-weight:700;color:'+(bal>=0?'var(--green)':'var(--red)')+';">'+money(bal)+'</span></div>'+
+      '<div class="grid2" style="margin-top:8px;">'+
+      '<div class="stat" style="background:var(--green-bg);"><div class="label">Ingresó</div><div class="value" style="font-size:16px;color:var(--green);">'+money(d.ingreso)+'</div></div>'+
+      '<div class="stat" style="background:var(--red-bg);"><div class="label">Gastó</div><div class="value" style="font-size:16px;color:var(--red);">'+money(d.gasto)+'</div></div>'+
+      '</div></div>';
+  }).join('') : '<div class="empty">Aún no hay movimientos registrados por día.</div>';
+
+  document.getElementById('savings-list').innerHTML = data.savings.length ? data.savings.map(x=>{
+    const p = x.goal>0 ? Math.min(100,(x.current/x.goal)*100) : 0;
+    return '<div class="card"><div class="name">'+escapeHtml(x.name)+'</div>'+
+    '<div class="meta">'+money(x.current)+' de '+money(x.goal)+'</div>'+
+    '<div class="progress-outer"><div class="progress-inner" style="width:'+p+'%;"></div></div>'+
+    '<div class="actions" style="margin-top:8px;"><button onclick="depositSaving(\''+x.id+'\')" style="margin:0;">Agregar dinero</button>'+
+    '<button class="ghost" onclick="editSavingGoal(\''+x.id+'\')">Editar meta</button>'+
+    '<button class="secondary" onclick="deleteSaving(\''+x.id+'\')">Borrar</button></div></div>';
+  }).join('') : '<div class="empty">Aún no hay categorías de ahorro.</div>';
+
+  document.getElementById('cards-list').innerHTML = data.cards.length ? data.cards.slice().sort((a,b)=>a.day-b.day).map(x=>
+    '<div class="row '+(x.paid?'paid':'')+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+'</div></div>'+
+    '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
+    (x.paid?'<span class="stamp">Pagado</span>':'')+
+    '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(x.paid?'checked':'')+' onchange="toggleCardPaid(\''+x.id+'\')">Pagado</label>'+
+    '<button class="ghost" onclick="editCard(\''+x.id+'\')">Editar</button>'+
+    '<button class="secondary" onclick="deleteCard(\''+x.id+'\')">Borrar</button></div></div>'
+  ).join('') : '<div class="empty">Aún no hay tarjetas registradas.</div>';
+
+  document.getElementById('cat-tags').innerHTML = data.categories.map(c=>
+    '<span class="cat-tag">'+escapeHtml(c)+'<button onclick="deleteCategory(\''+c.replace(/'/g,"\\'")+'\')">✕</button></span>'
+  ).join('');
+}
+
+loadData();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
