@@ -64,6 +64,8 @@
   #app-content{display:none;}
   .cat-tag{display:inline-flex;align-items:center;gap:6px;background:var(--gold-bg);color:var(--gold);border-radius:14px;padding:4px 10px;font-size:12px;font-weight:600;margin:0 6px 6px 0;}
   .cat-tag button{margin:0;background:transparent;color:var(--red);border:none;padding:0;font-size:14px;line-height:1;}
+  .row.due-soon{background:var(--orange-bg);border-color:var(--orange);}
+  .row.overdue{background:var(--red-bg);border-color:var(--red);}
   #greeting-msg{font-size:18px;font-weight:700;margin:0 0 14px;color:var(--ink);}
   @media(max-width:480px){
     .row{flex-direction:column;align-items:flex-start;}
@@ -100,8 +102,34 @@
     </div>
     <button style="width:100%;" id="auth-submit-btn" onclick="handleAuthSubmit()">Iniciar sesión</button>
     <button class="google" style="width:100%;" onclick="handleGoogleSignIn()">Continuar con Google</button>
+    <p id="forgot-link" style="font-size:12px;margin-top:10px;cursor:pointer;color:var(--ink-soft);text-decoration:underline;" onclick="handleForgotPassword()">¿Olvidaste tu contraseña?</p>
     <p id="auth-error" style="color:var(--red);font-size:12px;margin-top:8px;"></p>
     <p id="auth-info" style="color:var(--green);font-size:12px;margin-top:8px;"></p>
+    <p style="font-size:11px;margin-top:14px;color:var(--muted);cursor:pointer;text-decoration:underline;" onclick="openPrivacyModal()">Privacidad y términos</p>
+  </div>
+</div>
+
+<div id="recovery-screen" style="display:none;position:fixed;inset:0;background:var(--paper);align-items:center;justify-content:center;z-index:110;padding:20px;">
+  <div id="lock-box" style="max-width:340px;width:100%;">
+    <h1 style="font-size:20px;">Nueva contraseña</h1>
+    <p class="sub">Escribe tu nueva contraseña</p>
+    <div style="position:relative;">
+      <input id="recovery-password" type="password" placeholder="Mínimo 6 caracteres" style="padding-right:38px;">
+      <button type="button" onclick="toggleRecoveryVisibility()" style="position:absolute;right:4px;top:4px;background:transparent;color:var(--ink-soft);border:none;padding:4px 8px;margin:0;font-size:16px;cursor:pointer;">👁</button>
+    </div>
+    <button style="width:100%;" onclick="handleUpdatePassword()">Guardar nueva contraseña</button>
+    <p id="recovery-error" style="color:var(--red);font-size:12px;margin-top:8px;"></p>
+  </div>
+</div>
+
+<div id="privacy-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:120;padding:20px;">
+  <div style="max-width:480px;width:100%;background:#fff;border-radius:12px;padding:24px;max-height:80vh;overflow-y:auto;">
+    <h2 style="margin-top:0;font-size:18px;">Privacidad y términos</h2>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-soft);">
+      SYNK guarda la información que ingresas (nombre, correo, fecha de nacimiento, y tus registros de gastos, ingresos y ahorros) en una base de datos privada, protegida con tu cuenta y contraseña. Nadie más puede ver tus datos financieros — cada cuenta solo tiene acceso a su propia información.<br><br>
+      No vendemos ni compartimos tu información con terceros. Los datos existen únicamente para que puedas usar la app y llevar el control de tus finanzas. Puedes descargar una copia de tus datos o eliminarlos en cualquier momento desde la pestaña de Ajustes.
+    </p>
+    <button onclick="closePrivacyModal()">Cerrar</button>
   </div>
 </div>
 
@@ -132,6 +160,8 @@
       <div style="font-size:26px;font-weight:700;" id="stat-balance">$0</div>
       <div id="stat-alcanza" style="margin-top:4px;font-size:14px;"></div>
     </div>
+    <div class="section-title">Gasto por categoría este mes</div>
+    <div id="chart-categorias"></div>
     <div class="section-title">Presupuestos por categoría</div>
     <div id="budgets-list"></div>
     <div class="section-title">Pendientes de pago (fijos + tarjetas)</div>
@@ -313,7 +343,15 @@ function displayAccountInfo(email, meta){
 }
 
 async function initAuth(){
+  supa.auth.onAuthStateChange((event, session) => {
+    if(event === 'PASSWORD_RECOVERY'){
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('app-content').style.display = 'none';
+      document.getElementById('recovery-screen').style.display = 'flex';
+    }
+  });
   const { data: sessionData } = await supa.auth.getSession();
+  if(document.getElementById('recovery-screen').style.display === 'flex') return;
   if(sessionData.session){
     currentUserId = sessionData.session.user.id;
     await loadUserData();
@@ -327,6 +365,37 @@ async function initAuth(){
 async function handleGoogleSignIn(){
   await supa.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
 }
+
+async function handleForgotPassword(){
+  const email = document.getElementById('auth-email').value.trim();
+  const err = document.getElementById('auth-error');
+  const info = document.getElementById('auth-info');
+  err.textContent = ''; info.textContent = '';
+  if(!email){ err.textContent = 'Escribe tu correo arriba primero.'; return; }
+  const { error } = await supa.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+  if(error){ err.textContent = error.message; return; }
+  info.textContent = 'Te enviamos un correo con un link para crear una nueva contraseña.';
+}
+
+function toggleRecoveryVisibility(){
+  const input = document.getElementById('recovery-password');
+  const btn = event.target;
+  if(input.type === 'password'){ input.type = 'text'; btn.textContent = '🙈'; }
+  else{ input.type = 'password'; btn.textContent = '👁'; }
+}
+
+async function handleUpdatePassword(){
+  const pass = document.getElementById('recovery-password').value;
+  const err = document.getElementById('recovery-error');
+  if(pass.length < 6){ err.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+  const { error } = await supa.auth.updateUser({ password: pass });
+  if(error){ err.textContent = error.message; return; }
+  document.getElementById('recovery-screen').style.display = 'none';
+  await initAuth();
+}
+
+function openPrivacyModal(){ document.getElementById('privacy-modal').style.display = 'flex'; }
+function closePrivacyModal(){ document.getElementById('privacy-modal').style.display = 'none'; }
 
 async function handleSignUp(){
   const email = document.getElementById('auth-email').value.trim();
@@ -390,6 +459,8 @@ async function loadUserData(){
     if(error) throw error;
     data = Object.assign(defaultData(), rows.data || {});
     if(!data.budgets) data.budgets = {};
+    data.fixed.forEach(x=>{ if(!x.paidMonths){ x.paidMonths = x.paid ? [currentMonth()] : []; delete x.paid; } });
+    data.cards.forEach(x=>{ if(!x.paidMonths){ x.paidMonths = x.paid ? [currentMonth()] : []; delete x.paid; } });
     showStatus('Datos cargados', 'ok');
   }catch(e){
     data = defaultData();
@@ -485,7 +556,7 @@ function submitFixed(){
     Object.assign(it, {name, category, amount, day: day||1});
     cancelEditFixed();
   }else{
-    data.fixed.push({id:uid(), name, category, amount, day: day||1, paid:false});
+    data.fixed.push({id:uid(), name, category, amount, day: day||1, paidMonths:[]});
   }
   document.getElementById('f-name').value='';
   document.getElementById('f-amount').value='';
@@ -509,7 +580,11 @@ function cancelEditFixed(){
   document.getElementById('f-cancel').style.display = 'none';
 }
 function toggleFixedPaid(id){
-  const it = data.fixed.find(x=>x.id===id); if(it) it.paid=!it.paid;
+  const it = data.fixed.find(x=>x.id===id); if(!it) return;
+  if(!it.paidMonths) it.paidMonths = [];
+  const m = currentMonth();
+  if(it.paidMonths.includes(m)) it.paidMonths = it.paidMonths.filter(x=>x!==m);
+  else it.paidMonths.push(m);
   saveData(); render();
 }
 function deleteFixed(id){
@@ -632,7 +707,7 @@ function submitCard(){
     Object.assign(it, {name, amount, day: day||1});
     cancelEditCard();
   }else{
-    data.cards.push({id:uid(), name, amount, day: day||1, paid:false});
+    data.cards.push({id:uid(), name, amount, day: day||1, paidMonths:[]});
   }
   document.getElementById('c-name').value='';
   document.getElementById('c-amount').value='';
@@ -655,7 +730,11 @@ function cancelEditCard(){
   document.getElementById('c-cancel').style.display = 'none';
 }
 function toggleCardPaid(id){
-  const it = data.cards.find(x=>x.id===id); if(it) it.paid=!it.paid;
+  const it = data.cards.find(x=>x.id===id); if(!it) return;
+  if(!it.paidMonths) it.paidMonths = [];
+  const m = currentMonth();
+  if(it.paidMonths.includes(m)) it.paidMonths = it.paidMonths.filter(x=>x!==m);
+  else it.paidMonths.push(m);
   saveData(); render();
 }
 function deleteCard(id){
@@ -687,6 +766,15 @@ function render(){
     ? '<span class="alcanza-yes">Sí alcanza</span> con los ingresos registrados este mes'
     : '<span class="alcanza-no">No alcanza</span> — faltan ' + money(Math.abs(balance));
 
+  const catTotals = data.categories.map(cat=>({
+    cat, total: dailyThisMonth.filter(x=>x.category===cat).reduce((s,x)=>s+x.amount,0)
+  }));
+  const maxCat = Math.max(1, ...catTotals.map(c=>c.total));
+  document.getElementById('chart-categorias').innerHTML = catTotals.some(c=>c.total>0) ? '<div class="card">' + catTotals.map(c=>
+    '<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>'+escapeHtml(c.cat)+'</span><span>'+money(c.total)+'</span></div>'+
+    '<div class="progress-outer"><div class="progress-inner" style="width:'+(c.total/maxCat*100)+'%;background:var(--gold);"></div></div></div>'
+  ).join('') + '</div>' : '<div class="empty">Aún no hay gastos este mes para graficar.</div>';
+
   document.getElementById('budgets-list').innerHTML = data.categories.map(cat=>{
     const spent = dailyThisMonth.filter(x=>x.category===cat).reduce((s,x)=>s+x.amount,0);
     const budget = data.budgets[cat] || 0;
@@ -702,23 +790,31 @@ function render(){
       '<button onclick="setBudget(\''+cat.replace(/'/g,"\\'")+'\')" style="margin:0;">Guardar</button></div></div>';
   }).join('');
 
+  const todayDay = new Date().getDate();
+  function dueClass(day){
+    const diff = day - todayDay;
+    if(diff < 0) return 'overdue';
+    if(diff <= 3) return 'due-soon';
+    return '';
+  }
   const pendList = document.getElementById('pendientes-list');
   const pendItems = [
-    ...data.fixed.filter(x=>!x.paid).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'fijo'})),
-    ...data.cards.filter(x=>!x.paid).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'tarjeta'}))
+    ...data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'fijo'})),
+    ...data.cards.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'tarjeta'}))
   ].sort((a,b)=>a.day-b.day);
   pendList.innerHTML = pendItems.length ? pendItems.map(x=>
-    '<div class="row"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+' · '+x.type+'</div></div><div class="amount">'+money(x.amount)+'</div></div>'
+    '<div class="row '+dueClass(x.day)+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+' · '+x.type+(dueClass(x.day)==='overdue'?' · atrasado':dueClass(x.day)==='due-soon'?' · vence pronto':'')+'</div></div><div class="amount">'+money(x.amount)+'</div></div>'
   ).join('') : '<div class="empty">No hay pagos pendientes.</div>';
 
-  document.getElementById('fixed-list').innerHTML = data.fixed.length ? data.fixed.slice().sort((a,b)=>a.day-b.day).map(x=>
-    '<div class="row '+(x.paid?'paid':'')+'"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="name" style="margin-top:4px;">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+'</div></div>'+
+  document.getElementById('fixed-list').innerHTML = data.fixed.length ? data.fixed.slice().sort((a,b)=>a.day-b.day).map(x=>{
+    const isPaid = (x.paidMonths||[]).includes(month);
+    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="name" style="margin-top:4px;">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+'</div></div>'+
     '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
-    (x.paid?'<span class="stamp">Pagado</span>':'')+
-    '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(x.paid?'checked':'')+' onchange="toggleFixedPaid(\''+x.id+'\')">Pagado</label>'+
+    (isPaid?'<span class="stamp">Pagado</span>':'')+
+    '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(isPaid?'checked':'')+' onchange="toggleFixedPaid(\''+x.id+'\')">Pagado este mes</label>'+
     '<button class="ghost" onclick="editFixed(\''+x.id+'\')">Editar</button>'+
-    '<button class="secondary" onclick="deleteFixed(\''+x.id+'\')">Borrar</button></div></div>'
-  ).join('') : '<div class="empty">Aún no hay gastos fijos.</div>';
+    '<button class="secondary" onclick="deleteFixed(\''+x.id+'\')">Borrar</button></div></div>';
+  }).join('') : '<div class="empty">Aún no hay gastos fijos.</div>';
 
   document.getElementById('daily-list').innerHTML = data.daily.length ? data.daily.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>
     '<div class="row"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="meta">'+x.date+(x.note?' · '+escapeHtml(x.note):'')+'</div></div>'+
@@ -766,14 +862,15 @@ function render(){
     '<button class="secondary" onclick="deleteSaving(\''+x.id+'\')">Borrar</button></div></div>';
   }).join('') : '<div class="empty">Aún no hay categorías de ahorro.</div>';
 
-  document.getElementById('cards-list').innerHTML = data.cards.length ? data.cards.slice().sort((a,b)=>a.day-b.day).map(x=>
-    '<div class="row '+(x.paid?'paid':'')+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+'</div></div>'+
+  document.getElementById('cards-list').innerHTML = data.cards.length ? data.cards.slice().sort((a,b)=>a.day-b.day).map(x=>{
+    const isPaid = (x.paidMonths||[]).includes(month);
+    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+'</div></div>'+
     '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
-    (x.paid?'<span class="stamp">Pagado</span>':'')+
-    '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(x.paid?'checked':'')+' onchange="toggleCardPaid(\''+x.id+'\')">Pagado</label>'+
+    (isPaid?'<span class="stamp">Pagado</span>':'')+
+    '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(isPaid?'checked':'')+' onchange="toggleCardPaid(\''+x.id+'\')">Pagado este mes</label>'+
     '<button class="ghost" onclick="editCard(\''+x.id+'\')">Editar</button>'+
-    '<button class="secondary" onclick="deleteCard(\''+x.id+'\')">Borrar</button></div></div>'
-  ).join('') : '<div class="empty">Aún no hay tarjetas registradas.</div>';
+    '<button class="secondary" onclick="deleteCard(\''+x.id+'\')">Borrar</button></div></div>';
+  }).join('') : '<div class="empty">Aún no hay tarjetas registradas.</div>';
 
   document.getElementById('cat-tags').innerHTML = data.categories.map(c=>
     '<span class="cat-tag">'+escapeHtml(c)+'<button onclick="deleteCategory(\''+c.replace(/'/g,"\\'")+'\')">✕</button></span>'
