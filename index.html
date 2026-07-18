@@ -258,8 +258,9 @@
       </div>
       <div class="grid2">
         <div><label>Día de corte (1-31)</label><input id="c-cutoff" type="number" min="1" max="31" placeholder="10"></div>
-        <div><label>Día límite de pago (1-31)</label><input id="c-day" type="number" min="1" max="31" placeholder="20"></div>
+        <div><label>Fecha de pago (1-31)</label><input id="c-day" type="number" min="1" max="31" placeholder="20"></div>
       </div>
+      <label>Balance actual (lo que ya debes)</label><input id="c-balance" type="number" step="0.01" placeholder="0">
       <div class="actions">
         <button id="c-submit" onclick="submitCard()">Agregar tarjeta</button>
         <button class="ghost" id="c-cancel" style="display:none;" onclick="cancelEditCard()">Cancelar</button>
@@ -501,6 +502,7 @@ async function loadUserData(){
     data.cards.forEach(x=>{
       if(x.limit === undefined) x.limit = x.amount || 0;
       if(x.cutoffDay === undefined) x.cutoffDay = 1;
+      if(x.balance === undefined) x.balance = 0;
       if(!x.payments) x.payments = [];
       delete x.amount; delete x.paid; delete x.paidMonths;
     });
@@ -657,12 +659,19 @@ function toggleFixedPaid(id){
   const it = data.fixed.find(x=>x.id===id); if(!it) return;
   if(!it.paidMonths) it.paidMonths = [];
   const m = currentMonth();
-  if(it.paidMonths.includes(m)) it.paidMonths = it.paidMonths.filter(x=>x!==m);
-  else it.paidMonths.push(m);
+  if(it.paidMonths.includes(m)){
+    it.paidMonths = it.paidMonths.filter(x=>x!==m);
+    adjustCardBalance(it.account, -it.amount);
+  }else{
+    it.paidMonths.push(m);
+    adjustCardBalance(it.account, it.amount);
+  }
   saveData(); render();
 }
 function deleteFixed(id){
   if(!confirm('¿Borrar este gasto fijo?')) return;
+  const it = data.fixed.find(x=>x.id===id);
+  if(it && it.paidMonths && it.paidMonths.length) adjustCardBalance(it.account, -(it.paidMonths.length * it.amount));
   data.fixed = data.fixed.filter(x=>x.id!==id);
   saveData(); render();
 }
@@ -676,10 +685,13 @@ function submitDaily(){
   if(!amount) return;
   if(editingDailyId){
     const it = data.daily.find(x=>x.id===editingDailyId);
+    adjustCardBalance(it.account, -it.amount);
     Object.assign(it, {date, category, amount, note, account});
+    adjustCardBalance(account, amount);
     cancelEditDaily();
   }else{
     data.daily.push({id:uid(), date, category, amount, note, account});
+    adjustCardBalance(account, amount);
   }
   document.getElementById('d-amount').value='';
   document.getElementById('d-note').value='';
@@ -704,6 +716,8 @@ function cancelEditDaily(){
 }
 function deleteDaily(id){
   if(!confirm('¿Borrar este gasto?')) return;
+  const it = data.daily.find(x=>x.id===id);
+  if(it) adjustCardBalance(it.account, -it.amount);
   data.daily = data.daily.filter(x=>x.id!==id);
   saveData(); render();
 }
@@ -780,18 +794,20 @@ function submitCard(){
   const limit=parseFloat(document.getElementById('c-limit').value)||0;
   const cutoff=parseInt(document.getElementById('c-cutoff').value)||1;
   const day=parseInt(document.getElementById('c-day').value)||1;
+  const balance=parseFloat(document.getElementById('c-balance').value)||0;
   if(!name) return;
   if(editingCardId){
     const it = data.cards.find(x=>x.id===editingCardId);
-    Object.assign(it, {name, limit, cutoffDay: cutoff, day});
+    Object.assign(it, {name, limit, cutoffDay: cutoff, day, balance});
     cancelEditCard();
   }else{
-    data.cards.push({id:uid(), name, limit, cutoffDay: cutoff, day, payments:[]});
+    data.cards.push({id:uid(), name, limit, cutoffDay: cutoff, day, balance, payments:[]});
   }
   document.getElementById('c-name').value='';
   document.getElementById('c-limit').value='';
   document.getElementById('c-cutoff').value='';
   document.getElementById('c-day').value='';
+  document.getElementById('c-balance').value='';
   saveData(); render();
 }
 function editCard(id){
@@ -801,6 +817,7 @@ function editCard(id){
   document.getElementById('c-limit').value = it.limit;
   document.getElementById('c-cutoff').value = it.cutoffDay;
   document.getElementById('c-day').value = it.day;
+  document.getElementById('c-balance').value = it.balance || 0;
   document.getElementById('c-submit').textContent = 'Guardar cambios';
   document.getElementById('c-cancel').style.display = 'inline-block';
   document.getElementById('tarjetas').scrollIntoView({behavior:'smooth'});
@@ -815,18 +832,19 @@ function deleteCard(id){
   data.cards = data.cards.filter(x=>x.id!==id);
   saveData(); render();
 }
-function cardBalance(card){
-  const gastosDiarios = data.daily.filter(d=>d.account===card.name).reduce((s,d)=>s+d.amount,0);
-  const gastosFijos = data.fixed.filter(f=>f.account===card.name).reduce((s,f)=>s+(f.paidMonths||[]).length*f.amount,0);
-  const pagos = (card.payments||[]).reduce((s,p)=>s+p.amount,0);
-  return gastosDiarios + gastosFijos - pagos;
+function adjustCardBalance(accountName, delta){
+  if(!accountName || accountName==='Efectivo') return;
+  const card = data.cards.find(c=>c.name===accountName);
+  if(card) card.balance = (card.balance||0) + delta;
 }
+function cardBalance(card){ return card.balance || 0; }
 function makeCardPayment(cardId){
   const it = data.cards.find(x=>x.id===cardId); if(!it) return;
   const amt = parseFloat(prompt('¿Cuánto vas a pagar a '+it.name+'?'));
   if(!amt || amt<=0) return;
   if(!it.payments) it.payments = [];
   it.payments.push({id:uid(), date: new Date().toISOString().slice(0,10), amount: amt});
+  it.balance = (it.balance||0) - amt;
   saveData(); render();
   openCardDetail(cardId);
 }
@@ -848,8 +866,12 @@ function openCardDetail(cardId){
     '<div class="card">'+
     '<div class="label" style="font-size:12px;color:var(--muted);">Límite</div>'+
     '<div style="font-size:22px;font-weight:700;">'+money(card.limit||0)+'</div>'+
-    '<div class="label" style="font-size:12px;color:var(--muted);margin-top:10px;">Balance</div>'+
-    '<div style="font-size:22px;font-weight:700;color:'+(disponible>=0?'var(--green)':'var(--red)')+';">'+money(disponible)+'</div>'+
+    '<div class="grid2" style="margin-top:10px;">'+
+    '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance</div>'+
+    '<div style="font-size:22px;font-weight:700;color:#1F8A5C;">'+money(balance)+'</div></div>'+
+    '<div><div class="label" style="font-size:12px;color:var(--muted);">Disponible</div>'+
+    '<div style="font-size:22px;font-weight:700;color:#2D6CDF;">'+money(disponible)+'</div></div>'+
+    '</div>'+
     '<div class="meta" style="margin-top:6px;">Corte: día '+card.cutoffDay+' · Pago límite: día '+card.day+'</div>'+
     '<button onclick="makeCardPayment(\''+card.id+'\')">Hacer un pago</button></div>'+
     '<div class="section-title">Historial</div>'+
