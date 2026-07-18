@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>SYNK</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2D2A6E">
@@ -257,10 +260,10 @@
         <div><label>Límite</label><input id="c-limit" type="number" step="0.01" placeholder="0"></div>
       </div>
       <div class="grid2">
-        <div><label>Día de corte (1-31)</label><input id="c-cutoff" type="number" min="1" max="31" placeholder="10"></div>
+        <div><label>Fecha de corte (1-31)</label><input id="c-cutoff" type="number" min="1" max="31" placeholder="10"></div>
         <div><label>Fecha de pago (1-31)</label><input id="c-day" type="number" min="1" max="31" placeholder="20"></div>
       </div>
-      <label>Balance actual (lo que ya debes)</label><input id="c-balance" type="number" step="0.01" placeholder="0">
+      <label>Balance inicial</label><input id="c-balance" type="number" step="0.01" placeholder="0">
       <div class="actions">
         <button id="c-submit" onclick="submitCard()">Agregar tarjeta</button>
         <button class="ghost" id="c-cancel" style="display:none;" onclick="cancelEditCard()">Cancelar</button>
@@ -867,12 +870,12 @@ function openCardDetail(cardId){
     '<div class="label" style="font-size:12px;color:var(--muted);">Límite</div>'+
     '<div style="font-size:22px;font-weight:700;">'+money(card.limit||0)+'</div>'+
     '<div class="grid2" style="margin-top:10px;">'+
-    '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance</div>'+
-    '<div style="font-size:22px;font-weight:700;color:#1F8A5C;">'+money(balance)+'</div></div>'+
+    '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance inicial</div>'+
+    '<div style="font-size:22px;font-weight:700;color:#2D6CDF;">'+money(balance)+'</div></div>'+
     '<div><div class="label" style="font-size:12px;color:var(--muted);">Disponible</div>'+
-    '<div style="font-size:22px;font-weight:700;color:#2D6CDF;">'+money(disponible)+'</div></div>'+
+    '<div style="font-size:22px;font-weight:700;color:#1F8A5C;">'+money(disponible)+'</div></div>'+
     '</div>'+
-    '<div class="meta" style="margin-top:6px;">Corte: día '+card.cutoffDay+' · Pago límite: día '+card.day+'</div>'+
+    '<div class="meta" style="margin-top:6px;">Fecha de corte: día '+card.cutoffDay+' · Fecha de pago: día '+card.day+'</div>'+
     '<button onclick="makeCardPayment(\''+card.id+'\')">Hacer un pago</button></div>'+
     '<div class="section-title">Historial</div>'+
     (historial.length ? historial.map(h=>
@@ -956,7 +959,7 @@ function render(){
   document.getElementById('cards-summary').innerHTML = data.cards.length ? data.cards.map(c=>{
     const balance = cardBalance(c);
     const disponible = (c.limit||0) - balance;
-    return '<div class="row" style="cursor:pointer;" onclick="switchTab(\'tarjetas\');openCardDetail(\''+c.id+'\')"><div class="info"><div class="name">'+escapeHtml(c.name)+'</div><div class="meta">Corte día '+c.cutoffDay+' · Pago límite día '+c.day+'</div></div>'+
+    return '<div class="row" style="cursor:pointer;" onclick="switchTab(\'tarjetas\');openCardDetail(\''+c.id+'\')"><div class="info"><div class="name">'+escapeHtml(c.name)+'</div><div class="meta">Fecha de corte día '+c.cutoffDay+' · Fecha de pago día '+c.day+'</div></div>'+
     '<div class="amount" style="color:'+(balance>0?'var(--red)':'var(--green)')+';">'+money(balance)+' <span style="font-size:11px;color:var(--muted);font-weight:400;">debe</span></div></div>';
   }).join('') : '<div class="empty">Aún no tienes tarjetas registradas.</div>';
 
@@ -1020,7 +1023,7 @@ function render(){
     const balance = cardBalance(x);
     const disponible = (x.limit||0) - balance;
     return '<div class="row" style="cursor:pointer;" onclick="openCardDetail(\''+x.id+'\')"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div>'+
-    '<div class="meta">Límite '+money(x.limit||0)+' · Balance '+money(disponible)+' · Corte día '+x.cutoffDay+'</div></div>'+
+    '<div class="meta">Límite '+money(x.limit||0)+' · Disponible '+money(disponible)+' · Fecha de corte día '+x.cutoffDay+'</div></div>'+
     '<div class="actions"><button class="ghost" onclick="event.stopPropagation();editCard(\''+x.id+'\')">Editar</button>'+
     '<button class="secondary" onclick="event.stopPropagation();deleteCard(\''+x.id+'\')">Borrar</button></div></div>';
   }).join('') : '<div class="empty">Aún no hay tarjetas registradas.</div>';
