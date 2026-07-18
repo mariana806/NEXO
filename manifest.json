@@ -1,6 +1,6 @@
 {
-  "name": "Nexo",
-  "short_name": "Nexo",
+  "name": "Synk",
+  "short_name": "Synk",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#FAF8F3",
