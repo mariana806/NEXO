@@ -186,6 +186,7 @@
         <div><label>Monto</label><input id="f-amount" type="number" step="0.01" placeholder="0"></div>
         <div><label>Día de vencimiento (1-31)</label><input id="f-day" type="number" min="1" max="31" placeholder="15"></div>
       </div>
+      <label>¿Con qué cuenta/tarjeta lo pagas?</label><select id="f-account"></select>
       <div class="actions">
         <button id="f-submit" onclick="submitFixed()">Agregar gasto fijo</button>
         <button class="ghost" id="f-cancel" style="display:none;" onclick="cancelEditFixed()">Cancelar</button>
@@ -544,7 +545,7 @@ function fillCategorySelects(){
 
 function fillAccountSelects(){
   const options = '<option>Efectivo</option>' + data.cards.map(c=>'<option>'+escapeHtml(c.name)+'</option>').join('');
-  ['i-account','d-account'].forEach(id=>{
+  ['i-account','d-account','f-account'].forEach(id=>{
     const sel = document.getElementById(id);
     const current = sel.value;
     sel.innerHTML = options;
@@ -621,13 +622,14 @@ function submitFixed(){
   const amount=parseFloat(document.getElementById('f-amount').value);
   const day=parseInt(document.getElementById('f-day').value);
   const category=document.getElementById('f-cat').value;
+  const account=document.getElementById('f-account').value;
   if(!name||!amount) return;
   if(editingFixedId){
     const it = data.fixed.find(x=>x.id===editingFixedId);
-    Object.assign(it, {name, category, amount, day: day||1});
+    Object.assign(it, {name, category, amount, day: day||1, account});
     cancelEditFixed();
   }else{
-    data.fixed.push({id:uid(), name, category, amount, day: day||1, paidMonths:[]});
+    data.fixed.push({id:uid(), name, category, amount, day: day||1, account, paidMonths:[]});
   }
   document.getElementById('f-name').value='';
   document.getElementById('f-amount').value='';
@@ -641,6 +643,7 @@ function editFixed(id){
   document.getElementById('f-cat').value = it.category;
   document.getElementById('f-amount').value = it.amount;
   document.getElementById('f-day').value = it.day;
+  document.getElementById('f-account').value = it.account || 'Efectivo';
   document.getElementById('f-submit').textContent = 'Guardar cambios';
   document.getElementById('f-cancel').style.display = 'inline-block';
   document.getElementById('fijos').scrollIntoView({behavior:'smooth'});
@@ -813,9 +816,10 @@ function deleteCard(id){
   saveData(); render();
 }
 function cardBalance(card){
-  const gastos = data.daily.filter(d=>d.account===card.name).reduce((s,d)=>s+d.amount,0);
+  const gastosDiarios = data.daily.filter(d=>d.account===card.name).reduce((s,d)=>s+d.amount,0);
+  const gastosFijos = data.fixed.filter(f=>f.account===card.name).reduce((s,f)=>s+(f.paidMonths||[]).length*f.amount,0);
   const pagos = (card.payments||[]).reduce((s,p)=>s+p.amount,0);
-  return gastos - pagos;
+  return gastosDiarios + gastosFijos - pagos;
 }
 function makeCardPayment(cardId){
   const it = data.cards.find(x=>x.id===cardId); if(!it) return;
@@ -836,6 +840,7 @@ function openCardDetail(cardId){
   const disponible = (card.limit||0) - balance;
   const historial = [
     ...data.daily.filter(d=>d.account===card.name).map(d=>({date:d.date, tipo:'Cargo', monto:-d.amount, nota:d.note||d.category})),
+    ...data.fixed.filter(f=>f.account===card.name).flatMap(f=>(f.paidMonths||[]).map(m=>({date:m+'-'+String(f.day).padStart(2,'0'), tipo:'Cargo', monto:-f.amount, nota:f.name+' (fijo)'}))),
     ...(card.payments||[]).map(p=>({date:p.date, tipo:'Pago', monto:p.amount, nota:'Abono a la tarjeta'}))
   ].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('card-detail-content').innerHTML =
@@ -936,7 +941,7 @@ function render(){
 
   document.getElementById('fixed-list').innerHTML = data.fixed.length ? data.fixed.slice().sort((a,b)=>a.day-b.day).map(x=>{
     const isPaid = (x.paidMonths||[]).includes(month);
-    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="name" style="margin-top:4px;">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+'</div></div>'+
+    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="name" style="margin-top:4px;">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+' · '+escapeHtml(x.account||'Efectivo')+'</div></div>'+
     '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
     (isPaid?'<span class="stamp">Pagado</span>':'')+
     '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(isPaid?'checked':'')+' onchange="toggleFixedPaid(\''+x.id+'\')">Pagado este mes</label>'+
