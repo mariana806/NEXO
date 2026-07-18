@@ -160,11 +160,19 @@
       <div style="font-size:26px;font-weight:700;" id="stat-balance">$0</div>
       <div id="stat-alcanza" style="margin-top:4px;font-size:14px;"></div>
     </div>
+    <div class="section-title">Tus tarjetas</div>
+    <div id="cards-summary"></div>
     <div class="section-title">Gasto por categoría este mes</div>
     <div id="chart-categorias"></div>
-    <div class="section-title">Presupuestos por categoría</div>
+    <div class="section-title">Presupuestos</div>
     <div id="budgets-list"></div>
-    <div class="section-title">Pendientes de pago (fijos + tarjetas)</div>
+    <div class="card">
+      <label>Agregar presupuesto a una categoría</label>
+      <select id="new-budget-cat"></select>
+      <input id="new-budget-amount" type="number" step="0.01" placeholder="Monto del presupuesto">
+      <button onclick="addBudget()">Agregar presupuesto</button>
+    </div>
+    <div class="section-title">Pendientes de pago (gastos fijos)</div>
     <div id="pendientes-list"></div>
   </div>
 
@@ -245,16 +253,24 @@
     <div class="card">
       <div class="grid2">
         <div><label>Nombre de la tarjeta</label><input id="c-name" placeholder="Tarjeta 1"></div>
-        <div><label>Monto a pagar</label><input id="c-amount" type="number" step="0.01" placeholder="0"></div>
+        <div><label>Cupo total</label><input id="c-limit" type="number" step="0.01" placeholder="0"></div>
       </div>
-      <label>Día límite de pago (1-31)</label><input id="c-day" type="number" min="1" max="31" placeholder="20">
+      <div class="grid2">
+        <div><label>Día de corte (1-31)</label><input id="c-cutoff" type="number" min="1" max="31" placeholder="10"></div>
+        <div><label>Día límite de pago (1-31)</label><input id="c-day" type="number" min="1" max="31" placeholder="20"></div>
+      </div>
       <div class="actions">
         <button id="c-submit" onclick="submitCard()">Agregar tarjeta</button>
         <button class="ghost" id="c-cancel" style="display:none;" onclick="cancelEditCard()">Cancelar</button>
       </div>
     </div>
-    <div class="section-title">Tarjetas de crédito</div>
+    <div class="section-title">Tus tarjetas</div>
     <div id="cards-list"></div>
+  </div>
+
+  <div id="tarjeta-detalle" class="panel">
+    <button class="ghost" onclick="closeCardDetail()">← Volver a tarjetas</button>
+    <div id="card-detail-content"></div>
   </div>
 
   <div id="ajustes" class="panel">
@@ -481,7 +497,12 @@ async function loadUserData(){
     if(!data.budgets) data.budgets = {};
     if(!data.currency) data.currency = 'USD';
     data.fixed.forEach(x=>{ if(!x.paidMonths){ x.paidMonths = x.paid ? [currentMonth()] : []; delete x.paid; } });
-    data.cards.forEach(x=>{ if(!x.paidMonths){ x.paidMonths = x.paid ? [currentMonth()] : []; delete x.paid; } });
+    data.cards.forEach(x=>{
+      if(x.limit === undefined) x.limit = x.amount || 0;
+      if(x.cutoffDay === undefined) x.cutoffDay = 1;
+      if(!x.payments) x.payments = [];
+      delete x.amount; delete x.paid; delete x.paidMonths;
+    });
     showStatus('Datos cargados', 'ok');
   }catch(e){
     data = defaultData();
@@ -550,6 +571,25 @@ function setBudget(cat){
   if(isNaN(v)) return;
   data.budgets[cat] = v;
   saveData(); render();
+}
+function addBudget(){
+  const cat = document.getElementById('new-budget-cat').value;
+  const v = parseFloat(document.getElementById('new-budget-amount').value);
+  if(!cat || isNaN(v)) return;
+  data.budgets[cat] = v;
+  document.getElementById('new-budget-amount').value = '';
+  saveData(); render();
+}
+function removeBudget(cat){
+  delete data.budgets[cat];
+  saveData(); render();
+}
+function switchTab(tabName){
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.getElementById(tabName).classList.add('active');
+  const tabEl = document.querySelector('.tab[data-tab="'+tabName+'"]');
+  if(tabEl) tabEl.classList.add('active');
 }
 
 function downloadBackup(){
@@ -734,18 +774,20 @@ function deleteSaving(id){
 
 function submitCard(){
   const name=document.getElementById('c-name').value.trim();
-  const amount=parseFloat(document.getElementById('c-amount').value);
-  const day=parseInt(document.getElementById('c-day').value);
-  if(!name||!amount) return;
+  const limit=parseFloat(document.getElementById('c-limit').value)||0;
+  const cutoff=parseInt(document.getElementById('c-cutoff').value)||1;
+  const day=parseInt(document.getElementById('c-day').value)||1;
+  if(!name) return;
   if(editingCardId){
     const it = data.cards.find(x=>x.id===editingCardId);
-    Object.assign(it, {name, amount, day: day||1});
+    Object.assign(it, {name, limit, cutoffDay: cutoff, day});
     cancelEditCard();
   }else{
-    data.cards.push({id:uid(), name, amount, day: day||1, paidMonths:[]});
+    data.cards.push({id:uid(), name, limit, cutoffDay: cutoff, day, payments:[]});
   }
   document.getElementById('c-name').value='';
-  document.getElementById('c-amount').value='';
+  document.getElementById('c-limit').value='';
+  document.getElementById('c-cutoff').value='';
   document.getElementById('c-day').value='';
   saveData(); render();
 }
@@ -753,7 +795,8 @@ function editCard(id){
   const it = data.cards.find(x=>x.id===id); if(!it) return;
   editingCardId = id;
   document.getElementById('c-name').value = it.name;
-  document.getElementById('c-amount').value = it.amount;
+  document.getElementById('c-limit').value = it.limit;
+  document.getElementById('c-cutoff').value = it.cutoffDay;
   document.getElementById('c-day').value = it.day;
   document.getElementById('c-submit').textContent = 'Guardar cambios';
   document.getElementById('c-cancel').style.display = 'inline-block';
@@ -764,18 +807,58 @@ function cancelEditCard(){
   document.getElementById('c-submit').textContent = 'Agregar tarjeta';
   document.getElementById('c-cancel').style.display = 'none';
 }
-function toggleCardPaid(id){
-  const it = data.cards.find(x=>x.id===id); if(!it) return;
-  if(!it.paidMonths) it.paidMonths = [];
-  const m = currentMonth();
-  if(it.paidMonths.includes(m)) it.paidMonths = it.paidMonths.filter(x=>x!==m);
-  else it.paidMonths.push(m);
-  saveData(); render();
-}
 function deleteCard(id){
-  if(!confirm('¿Borrar esta tarjeta?')) return;
+  if(!confirm('¿Borrar esta tarjeta? Se pierde su historial de pagos.')) return;
   data.cards = data.cards.filter(x=>x.id!==id);
   saveData(); render();
+}
+function cardBalance(card){
+  const gastos = data.daily.filter(d=>d.account===card.name).reduce((s,d)=>s+d.amount,0);
+  const pagos = (card.payments||[]).reduce((s,p)=>s+p.amount,0);
+  return gastos - pagos;
+}
+function makeCardPayment(cardId){
+  const it = data.cards.find(x=>x.id===cardId); if(!it) return;
+  const amt = parseFloat(prompt('¿Cuánto vas a pagar a '+it.name+'?'));
+  if(!amt || amt<=0) return;
+  if(!it.payments) it.payments = [];
+  it.payments.push({id:uid(), date: new Date().toISOString().slice(0,10), amount: amt});
+  saveData(); render();
+  openCardDetail(cardId);
+}
+function openCardDetail(cardId){
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.getElementById('tarjeta-detalle').classList.add('active');
+  const card = data.cards.find(x=>x.id===cardId);
+  if(!card) return;
+  const balance = cardBalance(card);
+  const disponible = (card.limit||0) - balance;
+  const historial = [
+    ...data.daily.filter(d=>d.account===card.name).map(d=>({date:d.date, tipo:'Cargo', monto:-d.amount, nota:d.note||d.category})),
+    ...(card.payments||[]).map(p=>({date:p.date, tipo:'Pago', monto:p.amount, nota:'Abono a la tarjeta'}))
+  ].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('card-detail-content').innerHTML =
+    '<h2 style="margin:10px 0 4px;">'+escapeHtml(card.name)+'</h2>'+
+    '<div class="grid2">'+
+    '<div class="stat"><div class="label">Cupo total</div><div class="value">'+money(card.limit||0)+'</div></div>'+
+    '<div class="stat"><div class="label">Disponible</div><div class="value" style="color:'+(disponible>=0?'var(--green)':'var(--red)')+';">'+money(disponible)+'</div></div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:12px;"><div class="label" style="font-size:12px;color:var(--muted);">Debes actualmente</div>'+
+    '<div style="font-size:22px;font-weight:700;color:'+(balance>0?'var(--red)':'var(--green)')+';">'+money(balance)+'</div>'+
+    '<div class="meta">Corte: día '+card.cutoffDay+' · Pago límite: día '+card.day+'</div>'+
+    '<button onclick="makeCardPayment(\''+card.id+'\')">Hacer un pago</button></div>'+
+    '<div class="section-title">Historial</div>'+
+    (historial.length ? historial.map(h=>
+      '<div class="row"><div class="info"><div class="name">'+h.tipo+'</div><div class="meta">'+h.date+' · '+escapeHtml(h.nota||'')+'</div></div>'+
+      '<div class="amount" style="color:'+(h.monto<0?'var(--red)':'var(--green)')+';">'+(h.monto<0?'-':'+')+money(Math.abs(h.monto))+'</div></div>'
+    ).join('') : '<div class="empty">Sin movimientos todavía.</div>');
+}
+function closeCardDetail(){
+  document.getElementById('tarjeta-detalle').classList.remove('active');
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.getElementById('tarjetas').classList.add('active');
+  document.querySelector('.tab[data-tab="tarjetas"]').classList.add('active');
 }
 
 function render(){
@@ -790,8 +873,7 @@ function render(){
 
   const totalDaily = dailyThisMonth.reduce((s,x)=>s+x.amount,0);
   const totalFixed = data.fixed.reduce((s,x)=>s+x.amount,0);
-  const totalCards = data.cards.reduce((s,x)=>s+x.amount,0);
-  const totalGastos = totalDaily + totalFixed + totalCards;
+  const totalGastos = totalDaily + totalFixed;
   const totalIngresos = incomeThisMonth.reduce((s,x)=>s+x.amount,0);
   const balance = totalIngresos - totalGastos;
 
@@ -812,7 +894,8 @@ function render(){
     '<div class="progress-outer"><div class="progress-inner" style="width:'+(c.total/maxCat*100)+'%;background:var(--gold);"></div></div></div>'
   ).join('') + '</div>' : '<div class="empty">Aún no hay gastos este mes para graficar.</div>';
 
-  document.getElementById('budgets-list').innerHTML = data.categories.map(cat=>{
+  const budgetedCats = data.categories.filter(cat => data.budgets[cat] !== undefined && data.budgets[cat] !== null);
+  document.getElementById('budgets-list').innerHTML = budgetedCats.length ? budgetedCats.map(cat=>{
     const spent = dailyThisMonth.filter(x=>x.category===cat).reduce((s,x)=>s+x.amount,0);
     const budget = data.budgets[cat] || 0;
     const pct = budget>0 ? Math.min(100,(spent/budget)*100) : 0;
@@ -821,11 +904,15 @@ function render(){
     return '<div class="card">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;">'+
       '<span class="cat-pill">'+escapeHtml(cat)+'</span>'+
-      '<span style="font-size:12px;color:var(--muted);">'+(budget>0 ? money(spent)+' de '+money(budget) : money(spent)+' (sin presupuesto)')+'</span></div>'+
+      '<span style="font-size:12px;color:var(--muted);">'+money(spent)+' de '+money(budget)+'</span></div>'+
       '<div class="progress-outer"><div class="progress-inner '+barClass+'" style="width:'+pct+'%;"></div></div>'+
       '<div class="actions" style="margin-top:8px;"><input id="'+safeId+'" type="number" step="0.01" placeholder="Presupuesto" value="'+(budget||'')+'" style="width:140px;margin:0;">'+
-      '<button onclick="setBudget(\''+cat.replace(/'/g,"\\'")+'\')" style="margin:0;">Guardar</button></div></div>';
-  }).join('');
+      '<button onclick="setBudget(\''+cat.replace(/'/g,"\\'")+'\')" style="margin:0;">Guardar</button>'+
+      '<button class="secondary" onclick="removeBudget(\''+cat.replace(/'/g,"\\'")+'\')">Quitar</button></div></div>';
+  }).join('') : '<div class="empty">Aún no has agregado ningún presupuesto.</div>';
+
+  const noBudgetCats = data.categories.filter(cat => data.budgets[cat] === undefined || data.budgets[cat] === null);
+  document.getElementById('new-budget-cat').innerHTML = noBudgetCats.map(c=>'<option>'+escapeHtml(c)+'</option>').join('') || '<option value="">Todas las categorías ya tienen presupuesto</option>';
 
   const todayDay = new Date().getDate();
   function dueClass(day){
@@ -835,13 +922,17 @@ function render(){
     return '';
   }
   const pendList = document.getElementById('pendientes-list');
-  const pendItems = [
-    ...data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'fijo'})),
-    ...data.cards.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'tarjeta'}))
-  ].sort((a,b)=>a.day-b.day);
+  const pendItems = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'fijo'})).sort((a,b)=>a.day-b.day);
   pendList.innerHTML = pendItems.length ? pendItems.map(x=>
-    '<div class="row '+dueClass(x.day)+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+' · '+x.type+(dueClass(x.day)==='overdue'?' · atrasado':dueClass(x.day)==='due-soon'?' · vence pronto':'')+'</div></div><div class="amount">'+money(x.amount)+'</div></div>'
+    '<div class="row '+dueClass(x.day)+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+(dueClass(x.day)==='overdue'?' · atrasado':dueClass(x.day)==='due-soon'?' · vence pronto':'')+'</div></div><div class="amount">'+money(x.amount)+'</div></div>'
   ).join('') : '<div class="empty">No hay pagos pendientes.</div>';
+
+  document.getElementById('cards-summary').innerHTML = data.cards.length ? data.cards.map(c=>{
+    const balance = cardBalance(c);
+    const disponible = (c.limit||0) - balance;
+    return '<div class="row" style="cursor:pointer;" onclick="switchTab(\'tarjetas\');openCardDetail(\''+c.id+'\')"><div class="info"><div class="name">'+escapeHtml(c.name)+'</div><div class="meta">Corte día '+c.cutoffDay+' · Pago límite día '+c.day+'</div></div>'+
+    '<div class="amount" style="color:'+(balance>0?'var(--red)':'var(--green)')+';">'+money(balance)+' <span style="font-size:11px;color:var(--muted);font-weight:400;">debe</span></div></div>';
+  }).join('') : '<div class="empty">Aún no tienes tarjetas registradas.</div>';
 
   document.getElementById('fixed-list').innerHTML = data.fixed.length ? data.fixed.slice().sort((a,b)=>a.day-b.day).map(x=>{
     const isPaid = (x.paidMonths||[]).includes(month);
@@ -900,16 +991,12 @@ function render(){
   }).join('') : '<div class="empty">Aún no hay categorías de ahorro.</div>';
 
   document.getElementById('cards-list').innerHTML = data.cards.length ? data.cards.slice().sort((a,b)=>a.day-b.day).map(x=>{
-    const isPaid = (x.paidMonths||[]).includes(month);
-    const ingresosCuenta = data.income.filter(i=>i.account===x.name).reduce((s,i)=>s+i.amount,0);
-    const gastosCuenta = data.daily.filter(d=>d.account===x.name).reduce((s,d)=>s+d.amount,0);
-    const balanceCuenta = ingresosCuenta - gastosCuenta;
-    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+' · Balance: <span style="color:'+(balanceCuenta>=0?'var(--green)':'var(--red)')+';font-weight:700;">'+money(balanceCuenta)+'</span></div></div>'+
-    '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
-    (isPaid?'<span class="stamp">Pagado</span>':'')+
-    '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(isPaid?'checked':'')+' onchange="toggleCardPaid(\''+x.id+'\')">Pagado este mes</label>'+
-    '<button class="ghost" onclick="editCard(\''+x.id+'\')">Editar</button>'+
-    '<button class="secondary" onclick="deleteCard(\''+x.id+'\')">Borrar</button></div></div>';
+    const balance = cardBalance(x);
+    const disponible = (x.limit||0) - balance;
+    return '<div class="row" style="cursor:pointer;" onclick="openCardDetail(\''+x.id+'\')"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div>'+
+    '<div class="meta">Debes '+money(balance)+' · Disponible '+money(disponible)+' · Corte día '+x.cutoffDay+'</div></div>'+
+    '<div class="actions"><button class="ghost" onclick="event.stopPropagation();editCard(\''+x.id+'\')">Editar</button>'+
+    '<button class="secondary" onclick="event.stopPropagation();deleteCard(\''+x.id+'\')">Borrar</button></div></div>';
   }).join('') : '<div class="empty">Aún no hay tarjetas registradas.</div>';
 
   document.getElementById('cat-tags').innerHTML = data.categories.map(c=>
