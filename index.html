@@ -8,13 +8,13 @@
 <meta http-equiv="Expires" content="0">
 <title>SYNK</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#12303D">
+<meta name="theme-color" content="#1E3D36">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
-    --ink:#12303D; --ink-soft:#3E6472; --paper:#F2F6F5; --paper-line:#DCE7E5;
-    --card:#FFFFFF; --gold:#C97D2E; --gold-bg:#FBEADC; --green:#2F8F6D; --green-bg:#E1F3EB;
-    --orange:#D98E2B; --orange-bg:#FBF0DD; --red:#B23A2E; --red-bg:#F8E6E3; --muted:#7C93A0;
+    --ink:#1E3D36; --ink-soft:#4F7268; --paper:#F1F5EE; --paper-line:#DCE6DA;
+    --card:#FFFFFF; --gold:#C08A2E; --gold-bg:#F7ECD6; --green:#3C8361; --green-bg:#E3F1E9;
+    --orange:#D9954A; --orange-bg:#FBEEDD; --red:#A65036; --red-bg:#F3E6E1; --muted:#7C8F86;
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:Arial,sans-serif;background:var(--paper);color:var(--ink);}
@@ -953,9 +953,9 @@ function openCardDetail(cardId){
     '<div style="font-size:22px;font-weight:700;">'+money(card.limit||0)+'</div>'+
     '<div class="grid2" style="margin-top:10px;">'+
     '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance inicial</div>'+
-    '<div style="font-size:22px;font-weight:700;color:#2D6CDF;">'+money(balance)+'</div></div>'+
+    '<div style="font-size:22px;font-weight:700;color:#1E3D36;">'+money(balance)+'</div></div>'+
     '<div><div class="label" style="font-size:12px;color:var(--muted);">Disponible</div>'+
-    '<div style="font-size:22px;font-weight:700;color:#1F8A5C;">'+money(disponible)+'</div></div>'+
+    '<div style="font-size:22px;font-weight:700;color:#3C8361;">'+money(disponible)+'</div></div>'+
     '</div>'+
     '<div class="meta" style="margin-top:6px;">Fecha de corte: día '+card.cutoffDay+' · Fecha de pago: día '+card.day+'</div>'+
     '<button onclick="makeCardPayment(\''+card.id+'\')">Hacer un pago</button></div>'+
