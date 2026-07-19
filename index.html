@@ -39,7 +39,7 @@
   button.secondary{background:transparent;color:var(--red);border:1px solid var(--red);padding:5px 10px;font-size:12px;margin:0;}
   button.ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--paper-line);padding:5px 10px;font-size:12px;margin:0;}
   button.google{background:#fff;color:#3c4043;border:1px solid var(--paper-line);}
-  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--paper-line);border-radius:8px;margin-bottom:8px;background:var(--card);color:var(--ink);}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid var(--paper-line);border-radius:8px;margin-bottom:6px;background:var(--card);color:var(--ink);}
   .row.paid{background:var(--green-bg);border-color:var(--green);}
   .row .info{flex:1;min-width:0;}
   .row .name{font-weight:600;font-size:14px;}
@@ -1098,7 +1098,7 @@ function render(){
 
   document.getElementById('fixed-list').innerHTML = data.fixed.length ? data.fixed.slice().sort((a,b)=>a.day-b.day).map(x=>{
     const isPaid = (x.paidMonths||[]).includes(month);
-    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="name" style="margin-top:4px;">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+' · '+escapeHtml(x.account||'Efectivo')+'</div></div>'+
+    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><span class="cat-pill">'+escapeHtml(x.category)+'</span><div class="name" style="margin-top:2px;">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+' · '+escapeHtml(x.account||'Efectivo')+'</div></div>'+
     '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
     (isPaid?'<span class="stamp">Pagado</span>':'')+
     '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(isPaid?'checked':'')+' onchange="toggleFixedPaid(\''+x.id+'\')">Pagado este mes</label>'+
