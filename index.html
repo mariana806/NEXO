@@ -257,6 +257,11 @@
     <div id="savings-list"></div>
   </div>
 
+  <div id="meta-detalle" class="panel">
+    <button class="ghost" onclick="closeSavingsGoalDetail()">← Volver a metas</button>
+    <div id="meta-detalle-content"></div>
+  </div>
+
   <div id="cuentas-ahorro" class="panel">
     <div class="card">
       <div class="grid2">
@@ -538,6 +543,7 @@ async function loadUserData(){
     Object.keys(data.budgets||{}).forEach(k=>{ newBudgets[k.trim()] = data.budgets[k]; });
     data.budgets = newBudgets;
     if(!data.savingsAccounts) data.savingsAccounts = [];
+    data.savings.forEach(x=>{ if(!x.movements) x.movements = []; });
     data.savingsAccounts.forEach(x=>{
       if(!x.movements) x.movements = [];
       if(x.name && !x.name.endsWith(' - Ahorro')){
@@ -602,8 +608,11 @@ function fillCategorySelects(){
   });
 }
 
+function buildAccountOptions(){
+  return '<option>Efectivo</option>' + data.cards.map(c=>'<option>'+escapeHtml(c.name)+'</option>').join('') + data.savingsAccounts.map(s=>'<option>'+escapeHtml(s.name)+'</option>').join('');
+}
 function fillAccountSelects(){
-  const options = '<option>Efectivo</option>' + data.cards.map(c=>'<option>'+escapeHtml(c.name)+'</option>').join('') + data.savingsAccounts.map(s=>'<option>'+escapeHtml(s.name)+'</option>').join('');
+  const options = buildAccountOptions();
   ['i-account','d-account','f-account'].forEach(id=>{
     const sel = document.getElementById(id);
     const current = sel.value;
@@ -919,28 +928,78 @@ function addSaving(){
   const name=document.getElementById('s-name').value.trim();
   const goal=parseFloat(document.getElementById('s-goal').value)||0;
   if(!name) return;
-  data.savings.push({id:uid(), name, goal, current:0});
+  data.savings.push({id:uid(), name, goal, current:0, movements:[]});
   document.getElementById('s-name').value='';
   document.getElementById('s-goal').value='';
-  saveData(); render();
-}
-function depositSaving(id){
-  const amt = parseFloat(prompt('¿Cuánto quieres agregar a este ahorro?'));
-  if(!amt) return;
-  const it = data.savings.find(x=>x.id===id); if(it) it.current += amt;
-  saveData(); render();
-}
-function editSavingGoal(id){
-  const it = data.savings.find(x=>x.id===id); if(!it) return;
-  const val = parseFloat(prompt('Nueva meta para '+it.name, it.goal));
-  if(isNaN(val)) return;
-  it.goal = val;
   saveData(); render();
 }
 function deleteSaving(id){
   if(!confirm('¿Borrar esta categoría de ahorro?')) return;
   data.savings = data.savings.filter(x=>x.id!==id);
   saveData(); render();
+}
+function openSavingsGoalDetail(id){
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.getElementById('meta-detalle').classList.add('active');
+  const goal = data.savings.find(x=>x.id===id);
+  if(!goal) return;
+  const pct = goal.goal>0 ? Math.min(100,((goal.current||0)/goal.goal)*100) : 0;
+  const historial = (goal.movements||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('meta-detalle-content').innerHTML =
+    '<h2 style="margin:10px 0 4px;">'+escapeHtml(goal.name)+'</h2>'+
+    '<div class="card">'+
+    '<div class="grid2">'+
+    '<div class="stat"><div class="label">Ahorrado</div><div class="value">'+money(goal.current||0)+'</div></div>'+
+    '<div class="stat"><div class="label">Meta</div><div class="value">'+money(goal.goal||0)+'</div></div>'+
+    '</div>'+
+    '<div class="progress-outer" style="margin-top:10px;"><div class="progress-inner" style="width:'+pct+'%;"></div></div>'+
+    '</div>'+
+    '<div class="card">'+
+    '<div class="section-title" style="margin-top:0;">Editar</div>'+
+    '<label>Nombre</label><input id="meta-edit-name" value="'+escapeHtml(goal.name)+'">'+
+    '<label>Meta</label><input id="meta-edit-goal" type="number" step="0.01" value="'+(goal.goal||0)+'">'+
+    '<button onclick="saveSavingsGoalEdit(\''+goal.id+'\')">Guardar cambios</button>'+
+    '</div>'+
+    '<div class="card">'+
+    '<div class="section-title" style="margin-top:0;">Agregar dinero</div>'+
+    '<label>Monto</label><input id="meta-deposit-amount" type="number" step="0.01" placeholder="0">'+
+    '<label>¿De qué cuenta sale?</label><select id="meta-deposit-account">'+buildAccountOptions()+'</select>'+
+    '<button onclick="addSavingsGoalDeposit(\''+goal.id+'\')">Agregar</button>'+
+    '</div>'+
+    '<div class="section-title">Historial</div>'+
+    (historial.length ? historial.map(m=>
+      '<div class="row"><div class="info"><div class="name">Depósito</div><div class="meta">'+m.date+' · '+escapeHtml(m.account||'Efectivo')+'</div></div>'+
+      '<div class="amount" style="color:var(--green);">+'+money(m.amount)+'</div></div>'
+    ).join('') : '<div class="empty">Sin movimientos todavía.</div>');
+}
+function saveSavingsGoalEdit(id){
+  const goal = data.savings.find(x=>x.id===id); if(!goal) return;
+  const name = document.getElementById('meta-edit-name').value.trim();
+  const goalAmt = parseFloat(document.getElementById('meta-edit-goal').value);
+  if(!name) return;
+  goal.name = name;
+  if(!isNaN(goalAmt)) goal.goal = goalAmt;
+  saveData(); render();
+  openSavingsGoalDetail(id);
+}
+function addSavingsGoalDeposit(id){
+  const goal = data.savings.find(x=>x.id===id); if(!goal) return;
+  const amt = parseFloat(document.getElementById('meta-deposit-amount').value);
+  const account = document.getElementById('meta-deposit-account').value;
+  if(!amt || amt<=0) return;
+  goal.current = (goal.current||0) + amt;
+  if(!goal.movements) goal.movements = [];
+  goal.movements.push({id:uid(), date:new Date().toISOString().slice(0,10), amount: amt, account});
+  chargeAccount(account, amt);
+  saveData(); render();
+  openSavingsGoalDetail(id);
+}
+function closeSavingsGoalDetail(){
+  document.getElementById('meta-detalle').classList.remove('active');
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.getElementById('ahorros').classList.add('active');
+  document.querySelector('.tab[data-tab="ahorros"]').classList.add('active');
 }
 
 function submitCard(){
@@ -1189,12 +1248,10 @@ function render(){
     if(p >= 100){ colorClass = 'amt-green'; barClass=''; }
     else if(p >= 25){ colorClass = 'amt-orange'; barClass='mid'; }
     else { colorClass = 'amt-red'; barClass='over'; }
-    return '<div class="card"><div class="name">'+escapeHtml(x.name)+'</div>'+
+    return '<div class="card" style="cursor:pointer;" onclick="openSavingsGoalDetail(\''+x.id+'\')"><div class="name">'+escapeHtml(x.name)+'</div>'+
     '<div class="meta '+colorClass+'" style="font-weight:700;">'+money(x.current)+' de '+money(x.goal)+'</div>'+
     '<div class="progress-outer"><div class="progress-inner '+barClass+'" style="width:'+Math.min(100,p)+'%;"></div></div>'+
-    '<div class="actions" style="margin-top:8px;"><button onclick="depositSaving(\''+x.id+'\')" style="margin:0;">Agregar dinero</button>'+
-    '<button class="ghost" onclick="editSavingGoal(\''+x.id+'\')">Editar meta</button>'+
-    '<button class="secondary" onclick="deleteSaving(\''+x.id+'\')">Borrar</button></div></div>';
+    '<div class="actions" style="margin-top:8px;"><button class="secondary" onclick="event.stopPropagation();deleteSaving(\''+x.id+'\')">Borrar</button></div></div>';
   }).join('') : '<div class="empty">Aún no hay categorías de ahorro.</div>';
 
   document.getElementById('cards-list').innerHTML = data.cards.length ? data.cards.slice().sort((a,b)=>a.day-b.day).map(x=>{
