@@ -524,6 +524,13 @@ async function loadUserData(){
     data = Object.assign(defaultData(), rows.data || {});
     if(!data.budgets) data.budgets = {};
     if(!data.currency) data.currency = 'USD';
+    data.daily.forEach(d=>{ if(d.category) d.category = d.category.trim(); if(d.account) d.account = d.account.trim(); });
+    data.fixed.forEach(f=>{ if(f.category) f.category = f.category.trim(); if(f.account) f.account = f.account.trim(); });
+    data.income.forEach(i=>{ if(i.account) i.account = i.account.trim(); });
+    data.categories = data.categories.map(c=>c.trim());
+    const newBudgets = {};
+    Object.keys(data.budgets||{}).forEach(k=>{ newBudgets[k.trim()] = data.budgets[k]; });
+    data.budgets = newBudgets;
     if(!data.savingsAccounts) data.savingsAccounts = [];
     data.savingsAccounts.forEach(x=>{
       if(!x.movements) x.movements = [];
@@ -1065,7 +1072,8 @@ function render(){
   const totalAhorrado = data.savings.reduce((s,x)=>s+(x.current||0),0) + data.savingsAccounts.reduce((s,x)=>s+(x.balance||0),0);
   document.getElementById('stat-alcanza').innerHTML = 'Ahorrado: <strong style="color:var(--green);">'+money(totalAhorrado)+'</strong>';
 
-  const catTotals = data.categories.map(cat=>({
+  const allCatsThisMonth = Array.from(new Set([...data.categories, ...dailyThisMonth.map(x=>x.category).filter(Boolean)]));
+  const catTotals = allCatsThisMonth.map(cat=>({
     cat, total: dailyThisMonth.filter(x=>x.category===cat).reduce((s,x)=>s+x.amount,0)
   }));
   const maxCat = Math.max(1, ...catTotals.map(c=>c.total));
