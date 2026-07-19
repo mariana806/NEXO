@@ -617,6 +617,11 @@ function fillCategorySelects(){
 function buildAccountOptions(){
   return '<option>Efectivo</option>' + data.cards.map(c=>'<option>'+escapeHtml(c.name)+'</option>').join('') + data.savingsAccounts.map(s=>'<option>'+escapeHtml(s.name)+'</option>').join('');
 }
+function buildSavingsAccountOptions(){
+  return data.savingsAccounts.length
+    ? data.savingsAccounts.map(s=>'<option>'+escapeHtml(s.name)+'</option>').join('')
+    : '<option value="">No tienes cuentas de ahorro creadas</option>';
+}
 function fillAccountSelects(){
   const options = buildAccountOptions();
   ['i-account','d-account','f-account'].forEach(id=>{
@@ -1139,7 +1144,9 @@ function render(){
   const totalFixed = data.fixed.filter(x=>(x.paidMonths||[]).includes(month)).reduce((s,x)=>s+x.amount,0);
   const totalGastos = totalDaily + totalFixed;
   const totalIngresos = incomeThisMonth.reduce((s,x)=>s+x.amount,0);
-  const balance = totalIngresos - totalGastos;
+  const totalSavingsAccountBalance = data.savingsAccounts.reduce((s,a)=>s+(a.balance||0),0);
+  const totalAhorradoMetas = data.savings.reduce((s,g)=>s+(g.current||0),0);
+  const balance = totalIngresos - totalGastos + totalSavingsAccountBalance + totalAhorradoMetas;
 
   document.getElementById('stat-ingresos').textContent = money(totalIngresos);
   document.getElementById('stat-gastos').textContent = money(totalGastos);
@@ -1187,8 +1194,6 @@ function render(){
     if(diff <= 3) return 'due-soon';
     return '';
   }
-  const totalSavingsAccountBalance = data.savingsAccounts.reduce((s,a)=>s+(a.balance||0),0);
-  const totalAhorradoMetas = data.savings.reduce((s,g)=>s+(g.current||0),0);
   document.getElementById('accounts-summary').innerHTML = data.savingsAccounts.length ?
     '<div class="card" style="cursor:pointer;" onclick="switchTab(\'cuentas-ahorro\')">'+
     '<div class="label" style="font-size:12px;color:var(--muted);">Balance</div>'+
