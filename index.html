@@ -242,6 +242,18 @@
   </div>
 
   <div id="ahorros" class="panel">
+    <div class="section-title" style="margin-top:0;">Cuentas de ahorro</div>
+    <div class="card">
+      <div class="grid2">
+        <div><label>Nombre de la cuenta</label><input id="sa-name" placeholder="Cuenta banco, alcancía..."></div>
+        <div><label>Balance inicial</label><input id="sa-balance" type="number" step="0.01" placeholder="0"></div>
+      </div>
+      <div class="actions">
+        <button id="sa-submit" onclick="submitSavingsAccount()">Agregar cuenta de ahorro</button>
+        <button class="ghost" id="sa-cancel" style="display:none;" onclick="cancelEditSavingsAccount()">Cancelar</button>
+      </div>
+    </div>
+    <div id="savings-accounts-list"></div>
     <div class="card">
       <div class="grid2">
         <div><label>Categoría de ahorro</label><input id="s-name" placeholder="Emergencias, viaje..."></div>
@@ -320,7 +332,7 @@ const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DEFAULT_CATS = ['Comida','Transporte','Servicios','Salud','Vivienda','Otros'];
 function defaultData(){
-  return { fixed: [], daily: [], income: [], savings: [], cards: [], budgets: {}, categories: DEFAULT_CATS.slice(), currency: 'USD' };
+  return { fixed: [], daily: [], income: [], savings: [], cards: [], savingsAccounts: [], budgets: {}, categories: DEFAULT_CATS.slice(), currency: 'USD' };
 }
 let data = defaultData();
 let currentUserId = null;
@@ -501,6 +513,7 @@ async function loadUserData(){
     data = Object.assign(defaultData(), rows.data || {});
     if(!data.budgets) data.budgets = {};
     if(!data.currency) data.currency = 'USD';
+    if(!data.savingsAccounts) data.savingsAccounts = [];
     data.fixed.forEach(x=>{ if(!x.paidMonths){ x.paidMonths = x.paid ? [currentMonth()] : []; delete x.paid; } });
     data.cards.forEach(x=>{
       if(x.limit === undefined) x.limit = x.amount || 0;
@@ -549,7 +562,7 @@ function fillCategorySelects(){
 }
 
 function fillAccountSelects(){
-  const options = '<option>Efectivo</option>' + data.cards.map(c=>'<option>'+escapeHtml(c.name)+'</option>').join('');
+  const options = '<option>Efectivo</option>' + data.cards.map(c=>'<option>'+escapeHtml(c.name)+'</option>').join('') + data.savingsAccounts.map(s=>'<option>'+escapeHtml(s.name)+'</option>').join('');
   ['i-account','d-account','f-account'].forEach(id=>{
     const sel = document.getElementById(id);
     const current = sel.value;
@@ -664,17 +677,17 @@ function toggleFixedPaid(id){
   const m = currentMonth();
   if(it.paidMonths.includes(m)){
     it.paidMonths = it.paidMonths.filter(x=>x!==m);
-    adjustCardBalance(it.account, -it.amount);
+    chargeAccount(it.account, -it.amount);
   }else{
     it.paidMonths.push(m);
-    adjustCardBalance(it.account, it.amount);
+    chargeAccount(it.account, it.amount);
   }
   saveData(); render();
 }
 function deleteFixed(id){
   if(!confirm('¿Borrar este gasto fijo?')) return;
   const it = data.fixed.find(x=>x.id===id);
-  if(it && it.paidMonths && it.paidMonths.length) adjustCardBalance(it.account, -(it.paidMonths.length * it.amount));
+  if(it && it.paidMonths && it.paidMonths.length) chargeAccount(it.account, -(it.paidMonths.length * it.amount));
   data.fixed = data.fixed.filter(x=>x.id!==id);
   saveData(); render();
 }
@@ -688,13 +701,13 @@ function submitDaily(){
   if(!amount) return;
   if(editingDailyId){
     const it = data.daily.find(x=>x.id===editingDailyId);
-    adjustCardBalance(it.account, -it.amount);
+    chargeAccount(it.account, -it.amount);
     Object.assign(it, {date, category, amount, note, account});
-    adjustCardBalance(account, amount);
+    chargeAccount(account, amount);
     cancelEditDaily();
   }else{
     data.daily.push({id:uid(), date, category, amount, note, account});
-    adjustCardBalance(account, amount);
+    chargeAccount(account, amount);
   }
   document.getElementById('d-amount').value='';
   document.getElementById('d-note').value='';
@@ -720,7 +733,7 @@ function cancelEditDaily(){
 function deleteDaily(id){
   if(!confirm('¿Borrar este gasto?')) return;
   const it = data.daily.find(x=>x.id===id);
-  if(it) adjustCardBalance(it.account, -it.amount);
+  if(it) chargeAccount(it.account, -it.amount);
   data.daily = data.daily.filter(x=>x.id!==id);
   saveData(); render();
 }
@@ -733,10 +746,13 @@ function submitIncome(){
   if(!amount) return;
   if(editingIncomeId){
     const it = data.income.find(x=>x.id===editingIncomeId);
+    depositAccount(it.account, -it.amount);
     Object.assign(it, {date, amount, note, account});
+    depositAccount(account, amount);
     cancelEditIncome();
   }else{
     data.income.push({id:uid(), date, amount, note, account});
+    depositAccount(account, amount);
   }
   document.getElementById('i-amount').value='';
   document.getElementById('i-note').value='';
@@ -760,7 +776,56 @@ function cancelEditIncome(){
 }
 function deleteIncome(id){
   if(!confirm('¿Borrar este ingreso?')) return;
+  const it = data.income.find(x=>x.id===id);
+  if(it) depositAccount(it.account, -it.amount);
   data.income = data.income.filter(x=>x.id!==id);
+  saveData(); render();
+}
+
+let editingSavingsAccountId = null;
+function submitSavingsAccount(){
+  const name=document.getElementById('sa-name').value.trim();
+  const balance=parseFloat(document.getElementById('sa-balance').value)||0;
+  if(!name) return;
+  if(editingSavingsAccountId){
+    const it = data.savingsAccounts.find(x=>x.id===editingSavingsAccountId);
+    Object.assign(it, {name, balance});
+    cancelEditSavingsAccount();
+  }else{
+    data.savingsAccounts.push({id:uid(), name, balance});
+  }
+  document.getElementById('sa-name').value='';
+  document.getElementById('sa-balance').value='';
+  saveData(); render();
+}
+function editSavingsAccount(id){
+  const it = data.savingsAccounts.find(x=>x.id===id); if(!it) return;
+  editingSavingsAccountId = id;
+  document.getElementById('sa-name').value = it.name;
+  document.getElementById('sa-balance').value = it.balance;
+  document.getElementById('sa-submit').textContent = 'Guardar cambios';
+  document.getElementById('sa-cancel').style.display = 'inline-block';
+}
+function cancelEditSavingsAccount(){
+  editingSavingsAccountId = null;
+  document.getElementById('sa-submit').textContent = 'Agregar cuenta de ahorro';
+  document.getElementById('sa-cancel').style.display = 'none';
+}
+function deleteSavingsAccount(id){
+  if(!confirm('¿Borrar esta cuenta de ahorro?')) return;
+  data.savingsAccounts = data.savingsAccounts.filter(x=>x.id!==id);
+  saveData(); render();
+}
+function depositToSavingsAccount(id){
+  const amt = parseFloat(prompt('¿Cuánto quieres depositar?'));
+  if(!amt || amt<=0) return;
+  const it = data.savingsAccounts.find(x=>x.id===id); if(it) it.balance = (it.balance||0) + amt;
+  saveData(); render();
+}
+function withdrawFromSavingsAccount(id){
+  const amt = parseFloat(prompt('¿Cuánto quieres retirar?'));
+  if(!amt || amt<=0) return;
+  const it = data.savingsAccounts.find(x=>x.id===id); if(it) it.balance = (it.balance||0) - amt;
   saveData(); render();
 }
 
@@ -835,10 +900,23 @@ function deleteCard(id){
   data.cards = data.cards.filter(x=>x.id!==id);
   saveData(); render();
 }
-function adjustCardBalance(accountName, delta){
-  if(!accountName || accountName==='Efectivo') return;
-  const card = data.cards.find(c=>c.name===accountName);
-  if(card) card.balance = (card.balance||0) + delta;
+function findAccountByName(name){
+  const card = data.cards.find(c=>c.name===name);
+  if(card) return {type:'card', obj:card};
+  const sav = data.savingsAccounts.find(s=>s.name===name);
+  if(sav) return {type:'savings', obj:sav};
+  return null;
+}
+function chargeAccount(accountName, amount){
+  const acc = findAccountByName(accountName);
+  if(!acc) return;
+  if(acc.type==='card') acc.obj.balance = (acc.obj.balance||0) + amount;
+  else acc.obj.balance = (acc.obj.balance||0) - amount;
+}
+function depositAccount(accountName, amount){
+  const acc = findAccountByName(accountName);
+  if(!acc || acc.type!=='savings') return;
+  acc.obj.balance = (acc.obj.balance||0) + amount;
 }
 function cardBalance(card){ return card.balance || 0; }
 function makeCardPayment(cardId){
@@ -1004,6 +1082,15 @@ function render(){
       '<div class="stat" style="background:var(--red-bg);"><div class="label">Gastó</div><div class="value" style="font-size:16px;color:var(--red);">'+money(d.gasto)+'</div></div>'+
       '</div></div>';
   }).join('') : '<div class="empty">Aún no hay movimientos registrados por día.</div>';
+
+  document.getElementById('savings-accounts-list').innerHTML = data.savingsAccounts.length ? data.savingsAccounts.map(x=>
+    '<div class="row"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div></div>'+
+    '<div class="actions"><div class="amount" style="color:'+((x.balance||0)>=0?'var(--green)':'var(--red)')+';">'+money(x.balance||0)+'</div>'+
+    '<button class="ghost" onclick="depositToSavingsAccount(\''+x.id+'\')" style="margin:0;">Depositar</button>'+
+    '<button class="ghost" onclick="withdrawFromSavingsAccount(\''+x.id+'\')" style="margin:0;">Retirar</button>'+
+    '<button class="ghost" onclick="editSavingsAccount(\''+x.id+'\')">Editar</button>'+
+    '<button class="secondary" onclick="deleteSavingsAccount(\''+x.id+'\')">Borrar</button></div></div>'
+  ).join('') : '<div class="empty">Aún no tienes cuentas de ahorro.</div>';
 
   document.getElementById('savings-list').innerHTML = data.savings.length ? data.savings.map(x=>{
     const p = x.goal>0 ? Math.min(150,(x.current/x.goal)*100) : 0;
