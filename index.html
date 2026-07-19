@@ -167,7 +167,10 @@
     </div>
     <div class="section-title">Tarjetas de crédito</div>
     <div id="cards-summary"></div>
+    <div class="section-title">Pendientes de pago (gastos fijos)</div>
+    <div id="pendientes-list"></div>
     <div class="section-title">Gasto de categoría mensual</div>
+    <input id="cat-month-select" type="month" onchange="changeCatMonth()" style="margin-bottom:10px;">
     <div id="chart-categorias"></div>
     <div class="section-title">Presupuestos</div>
     <div id="budgets-list"></div>
@@ -177,8 +180,6 @@
       <input id="new-budget-amount" type="number" step="0.01" placeholder="Monto del presupuesto">
       <button onclick="addBudget()">Agregar presupuesto</button>
     </div>
-    <div class="section-title">Pendientes de pago (gastos fijos)</div>
-    <div id="pendientes-list"></div>
   </div>
 
   <div id="fijos" class="panel">
@@ -350,6 +351,11 @@ let currentUserId = null;
 let currentUserName = '';
 let authMode = 'login';
 let editingFixedId = null, editingDailyId = null, editingIncomeId = null, editingCardId = null;
+let selectedCatMonth = null;
+function changeCatMonth(){
+  selectedCatMonth = document.getElementById('cat-month-select').value || null;
+  render();
+}
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function money(n){
@@ -1072,15 +1078,19 @@ function render(){
   const totalAhorrado = data.savings.reduce((s,x)=>s+(x.current||0),0) + data.savingsAccounts.reduce((s,x)=>s+(x.balance||0),0);
   document.getElementById('stat-alcanza').innerHTML = 'Ahorrado: <strong style="color:var(--green);">'+money(totalAhorrado)+'</strong>';
 
-  const allCatsThisMonth = Array.from(new Set([...data.categories, ...dailyThisMonth.map(x=>x.category).filter(Boolean)]));
+  const catMonth = selectedCatMonth || month;
+  document.getElementById('cat-month-select').value = catMonth;
+  const dailyForChart = data.daily.filter(x=>x.date && x.date.slice(0,7)===catMonth);
+  const fixedForChart = data.fixed.filter(f=>(f.paidMonths||[]).includes(catMonth));
+  const allCatsThisMonth = Array.from(new Set([...data.categories, ...dailyForChart.map(x=>x.category).filter(Boolean), ...fixedForChart.map(x=>x.category).filter(Boolean)]));
   const catTotals = allCatsThisMonth.map(cat=>({
-    cat, total: dailyThisMonth.filter(x=>x.category===cat).reduce((s,x)=>s+x.amount,0)
+    cat, total: dailyForChart.filter(x=>x.category===cat).reduce((s,x)=>s+x.amount,0) + fixedForChart.filter(x=>x.category===cat).reduce((s,x)=>s+x.amount,0)
   }));
   const maxCat = Math.max(1, ...catTotals.map(c=>c.total));
   document.getElementById('chart-categorias').innerHTML = catTotals.some(c=>c.total>0) ? '<div class="card">' + catTotals.map(c=>
     '<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>'+escapeHtml(c.cat)+'</span><span>'+money(c.total)+'</span></div>'+
     '<div class="progress-outer"><div class="progress-inner" style="width:'+(c.total/maxCat*100)+'%;background:var(--gold);"></div></div></div>'
-  ).join('') + '</div>' : '<div class="empty">Aún no hay gastos este mes para graficar.</div>';
+  ).join('') + '</div>' : '<div class="empty">No hay gastos ese mes para graficar.</div>';
 
   const budgetedCats = data.categories.filter(cat => data.budgets[cat] !== undefined && data.budgets[cat] !== null);
   document.getElementById('budgets-list').innerHTML = budgetedCats.length ? budgetedCats.map(cat=>{
