@@ -169,6 +169,8 @@
     <div id="cards-summary"></div>
     <div class="section-title">Cuentas</div>
     <div id="accounts-summary"></div>
+    <div class="section-title">Ahorro</div>
+    <div id="savings-summary"></div>
     <div class="section-title">Pendientes de pago (gastos fijos)</div>
     <div id="pendientes-list"></div>
     <div class="section-title">Gasto de categoría mensual</div>
@@ -1187,13 +1189,16 @@ function render(){
   }
   const totalSavingsAccountBalance = data.savingsAccounts.reduce((s,a)=>s+(a.balance||0),0);
   const totalAhorradoMetas = data.savings.reduce((s,g)=>s+(g.current||0),0);
-  document.getElementById('accounts-summary').innerHTML = (data.savingsAccounts.length || data.savings.length) ?
+  document.getElementById('accounts-summary').innerHTML = data.savingsAccounts.length ?
     '<div class="card" style="cursor:pointer;" onclick="switchTab(\'cuentas-ahorro\')">'+
-    '<div class="label" style="font-size:12px;color:var(--muted);">Saldo total</div>'+
+    '<div class="label" style="font-size:12px;color:var(--muted);">Balance</div>'+
     '<div style="font-size:22px;font-weight:700;color:var(--green);">'+money(totalSavingsAccountBalance)+'</div>'+
-    '<div class="label" style="font-size:12px;color:var(--muted);margin-top:10px;">Total ahorrado</div>'+
+    '</div>' : '<div class="empty">Aún no tienes cuentas de ahorro.</div>';
+  document.getElementById('savings-summary').innerHTML = data.savings.length ?
+    '<div class="card" style="cursor:pointer;" onclick="switchTab(\'ahorros\')">'+
+    '<div class="label" style="font-size:12px;color:var(--muted);">Total ahorrado</div>'+
     '<div style="font-size:22px;font-weight:700;color:var(--green);">'+money(totalAhorradoMetas)+'</div>'+
-    '</div>' : '<div class="empty">Aún no tienes cuentas ni metas de ahorro.</div>';
+    '</div>' : '<div class="empty">Aún no tienes metas de ahorro.</div>';
 
   const pendList = document.getElementById('pendientes-list');
   const pendItems = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'fijo'})).sort((a,b)=>a.day-b.day);
