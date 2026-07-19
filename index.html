@@ -1189,12 +1189,19 @@ function render(){
     '<div class="row '+dueClass(x.day)+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+(dueClass(x.day)==='overdue'?' · atrasado':dueClass(x.day)==='due-soon'?' · vence pronto':'')+'</div></div><div class="amount">'+money(x.amount)+'</div></div>'
   ).join('') : '<div class="empty">No hay pagos pendientes.</div>';
 
-  document.getElementById('cards-summary').innerHTML = data.cards.length ? data.cards.map(c=>{
-    const balance = cardBalance(c);
-    const disponible = (c.limit||0) - balance;
-    return '<div class="row" style="cursor:pointer;" onclick="switchTab(\'tarjetas\');openCardDetail(\''+c.id+'\')"><div class="info"><div class="name">'+escapeHtml(c.name)+'</div><div class="meta">Fecha de corte día '+c.cutoffDay+' · Fecha de pago día '+c.day+'</div></div>'+
-    '<div class="amount" style="color:'+(balance>0?'var(--red)':'var(--green)')+';">'+money(balance)+' <span style="font-size:11px;color:var(--muted);font-weight:400;">debe</span></div></div>';
-  }).join('') : '<div class="empty">Aún no tienes tarjetas registradas.</div>';
+  const totalCardBalance = data.cards.reduce((s,c)=>s+cardBalance(c),0);
+  const totalCardLimit = data.cards.reduce((s,c)=>s+(c.limit||0),0);
+  const totalCardDisponible = totalCardLimit - totalCardBalance;
+  document.getElementById('cards-summary').innerHTML = data.cards.length ?
+    '<div class="card" style="cursor:pointer;" onclick="switchTab(\'tarjetas\')">'+
+    '<div class="grid2">'+
+    '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance</div>'+
+    '<div style="font-size:22px;font-weight:700;color:var(--red);">'+money(totalCardBalance)+'</div></div>'+
+    '<div><div class="label" style="font-size:12px;color:var(--muted);">Disponible</div>'+
+    '<div style="font-size:22px;font-weight:700;color:var(--green);">'+money(totalCardDisponible)+'</div></div>'+
+    '</div>'+
+    '<div class="meta" style="margin-top:8px;">Toca para ver tus tarjetas y su historial</div></div>'
+    : '<div class="empty">Aún no tienes tarjetas registradas.</div>';
 
   document.getElementById('fixed-list').innerHTML = data.fixed.length ? data.fixed.slice().sort((a,b)=>a.day-b.day).map(x=>{
     const isPaid = (x.paidMonths||[]).includes(month);
