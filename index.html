@@ -189,15 +189,15 @@
       </div>
       <div class="grid2">
         <div><label>Monto</label><input id="f-amount" type="number" step="0.01" placeholder="0"></div>
-        <div><label>Día de vencimiento (1-31)</label><input id="f-day" type="number" min="1" max="31" placeholder="15"></div>
+        <div><label>Fecha de vencimiento</label><input id="f-day" type="date"></div>
       </div>
-      <label>¿Con qué cuenta/tarjeta lo pagas?</label><select id="f-account"></select>
+      <label>Método de pago</label><select id="f-account"></select>
       <div class="actions">
         <button id="f-submit" onclick="submitFixed()">Agregar gasto fijo</button>
         <button class="ghost" id="f-cancel" style="display:none;" onclick="cancelEditFixed()">Cancelar</button>
       </div>
     </div>
-    <div class="section-title">Lista de gastos fijos</div>
+    <div class="section-title">Detalle de gastos fijos</div>
     <div id="fixed-list"></div>
   </div>
 
@@ -643,7 +643,8 @@ function restoreBackup(event){
 function submitFixed(){
   const name=document.getElementById('f-name').value.trim();
   const amount=parseFloat(document.getElementById('f-amount').value);
-  const day=parseInt(document.getElementById('f-day').value);
+  const dayValue=document.getElementById('f-day').value;
+  const day=dayValue ? parseInt(dayValue.split('-')[2]) : 1;
   const category=document.getElementById('f-cat').value;
   const account=document.getElementById('f-account').value;
   if(!name||!amount) return;
@@ -665,7 +666,11 @@ function editFixed(id){
   document.getElementById('f-name').value = it.name;
   document.getElementById('f-cat').value = it.category;
   document.getElementById('f-amount').value = it.amount;
-  document.getElementById('f-day').value = it.day;
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dd = String(it.day||1).padStart(2,'0');
+  document.getElementById('f-day').value = yyyy+'-'+mm+'-'+dd;
   document.getElementById('f-account').value = it.account || 'Efectivo';
   document.getElementById('f-submit').textContent = 'Guardar cambios';
   document.getElementById('f-cancel').style.display = 'inline-block';
