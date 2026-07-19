@@ -1044,9 +1044,8 @@ function render(){
   document.getElementById('stat-gastos').textContent = money(totalGastos);
   document.getElementById('stat-balance').textContent = money(balance);
   document.getElementById('stat-balance').style.color = balance>=0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('stat-alcanza').innerHTML = balance>=0
-    ? '<span class="alcanza-yes">Sí alcanza</span> con los ingresos registrados este mes'
-    : '<span class="alcanza-no">No alcanza</span> — faltan ' + money(Math.abs(balance));
+  const totalAhorrado = data.savings.reduce((s,x)=>s+(x.current||0),0) + data.savingsAccounts.reduce((s,x)=>s+(x.balance||0),0);
+  document.getElementById('stat-alcanza').innerHTML = 'Ahorrado: <strong style="color:var(--green);">'+money(totalAhorrado)+'</strong>';
 
   const catTotals = data.categories.map(cat=>({
     cat, total: dailyThisMonth.filter(x=>x.category===cat).reduce((s,x)=>s+x.amount,0)
