@@ -148,8 +148,8 @@
     <div class="tab" data-tab="diarios">Gastos diarios</div>
     <div class="tab" data-tab="ingresos">Ingresos</div>
     <div class="tab" data-tab="dias">Por día</div>
-    <div class="tab" data-tab="ahorros">Ahorros</div>
-    <div class="tab" data-tab="cuentas-ahorro">Cuentas de ahorro</div>
+    <div class="tab" data-tab="ahorros">Metas de ahorro</div>
+    <div class="tab" data-tab="cuentas-ahorro">Cuentas</div>
     <div class="tab" data-tab="tarjetas">Tarjetas</div>
     <div class="tab" data-tab="ajustes">Ajustes</div>
   </div>
@@ -189,7 +189,8 @@
       </div>
       <div class="grid2">
         <div><label>Monto</label><input id="f-amount" type="number" step="0.01" placeholder="0"></div>
-        <div><label>Fecha de vencimiento</label><input id="f-day" type="date"></div>
+        <div><label>Fecha de vencimiento</label><input id="f-day" type="date">
+        <p class="sub" style="margin:2px 0 0;">(solo se usa el día del mes)</p></div>
       </div>
       <label>Método de pago</label><select id="f-account"></select>
       <div class="actions">
@@ -227,7 +228,7 @@
         <div><label>Fecha</label><input id="i-date" type="date"></div>
         <div><label>Monto</label><input id="i-amount" type="number" step="0.01" placeholder="0"></div>
       </div>
-      <label>Tipo de banco</label><select id="i-account"></select>
+      <label>¿A qué cuenta entró?</label><select id="i-account"></select>
       <label>Nota (opcional)</label><input id="i-note" placeholder="fuente del ingreso">
       <div class="actions">
         <button id="i-submit" onclick="submitIncome()">Agregar ingreso</button>
@@ -270,6 +271,11 @@
     <div id="savings-accounts-list"></div>
   </div>
 
+  <div id="cuenta-ahorro-detalle" class="panel">
+    <button class="ghost" onclick="closeSavingsAccountDetail()">← Volver a cuentas</button>
+    <div id="savings-account-detail-content"></div>
+  </div>
+
   <div id="tarjetas" class="panel">
     <div class="card">
       <div class="grid2">
@@ -280,7 +286,7 @@
         <div><label>Fecha de corte (1-31)</label><input id="c-cutoff" type="number" min="1" max="31" placeholder="10"></div>
         <div><label>Fecha de pago (1-31)</label><input id="c-day" type="number" min="1" max="31" placeholder="20"></div>
       </div>
-      <label>Balance inicial</label><input id="c-balance" type="number" step="0.01" placeholder="0">
+      <label>Balance</label><input id="c-balance" type="number" step="0.01" placeholder="0">
       <div class="actions">
         <button id="c-submit" onclick="submitCard()">Agregar tarjeta</button>
         <button class="ghost" id="c-cancel" style="display:none;" onclick="cancelEditCard()">Cancelar</button>
@@ -519,6 +525,7 @@ async function loadUserData(){
     if(!data.budgets) data.budgets = {};
     if(!data.currency) data.currency = 'USD';
     if(!data.savingsAccounts) data.savingsAccounts = [];
+    data.savingsAccounts.forEach(x=>{ if(!x.movements) x.movements = []; });
     data.fixed.forEach(x=>{ if(!x.paidMonths){ x.paidMonths = x.paid ? [currentMonth()] : []; delete x.paid; } });
     data.cards.forEach(x=>{
       if(x.limit === undefined) x.limit = x.amount || 0;
@@ -802,7 +809,7 @@ function submitSavingsAccount(){
     Object.assign(it, {name, balance});
     cancelEditSavingsAccount();
   }else{
-    data.savingsAccounts.push({id:uid(), name, balance});
+    data.savingsAccounts.push({id:uid(), name, balance, movements:[]});
   }
   document.getElementById('sa-name').value='';
   document.getElementById('sa-balance').value='';
@@ -829,14 +836,53 @@ function deleteSavingsAccount(id){
 function depositToSavingsAccount(id){
   const amt = parseFloat(prompt('¿Cuánto quieres depositar?'));
   if(!amt || amt<=0) return;
-  const it = data.savingsAccounts.find(x=>x.id===id); if(it) it.balance = (it.balance||0) + amt;
+  const it = data.savingsAccounts.find(x=>x.id===id); if(!it) return;
+  it.balance = (it.balance||0) + amt;
+  if(!it.movements) it.movements = [];
+  it.movements.push({id:uid(), date:new Date().toISOString().slice(0,10), tipo:'Depósito manual', amount: amt});
   saveData(); render();
+  if(document.getElementById('cuenta-ahorro-detalle').classList.contains('active')) openSavingsAccountDetail(id);
 }
 function withdrawFromSavingsAccount(id){
   const amt = parseFloat(prompt('¿Cuánto quieres retirar?'));
   if(!amt || amt<=0) return;
-  const it = data.savingsAccounts.find(x=>x.id===id); if(it) it.balance = (it.balance||0) - amt;
+  const it = data.savingsAccounts.find(x=>x.id===id); if(!it) return;
+  it.balance = (it.balance||0) - amt;
+  if(!it.movements) it.movements = [];
+  it.movements.push({id:uid(), date:new Date().toISOString().slice(0,10), tipo:'Retiro manual', amount: -amt});
   saveData(); render();
+  if(document.getElementById('cuenta-ahorro-detalle').classList.contains('active')) openSavingsAccountDetail(id);
+}
+function openSavingsAccountDetail(id){
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.getElementById('cuenta-ahorro-detalle').classList.add('active');
+  const acc = data.savingsAccounts.find(x=>x.id===id);
+  if(!acc) return;
+  const historial = [
+    ...(acc.movements||[]).map(m=>({date:m.date, tipo:m.tipo, monto:m.amount})),
+    ...data.daily.filter(d=>d.account===acc.name).map(d=>({date:d.date, tipo:'Gasto', monto:-d.amount, nota:d.note||d.category})),
+    ...data.income.filter(i=>i.account===acc.name).map(i=>({date:i.date, tipo:'Ingreso', monto:i.amount, nota:i.note})),
+    ...data.fixed.filter(f=>f.account===acc.name).flatMap(f=>(f.paidMonths||[]).map(m=>({date:m+'-'+String(f.day).padStart(2,'0'), tipo:'Gasto fijo', monto:-f.amount, nota:f.name})))
+  ].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('savings-account-detail-content').innerHTML =
+    '<h2 style="margin:10px 0 4px;">'+escapeHtml(acc.name)+'</h2>'+
+    '<div class="card">'+
+    '<div class="label" style="font-size:12px;color:var(--muted);">Balance</div>'+
+    '<div style="font-size:24px;font-weight:700;color:'+((acc.balance||0)>=0?'var(--green)':'var(--red)')+';">'+money(acc.balance||0)+'</div>'+
+    '<div class="actions" style="margin-top:8px;"><button onclick="depositToSavingsAccount(\''+acc.id+'\')" style="margin:0;">Depositar</button>'+
+    '<button class="ghost" onclick="withdrawFromSavingsAccount(\''+acc.id+'\')">Retirar</button></div></div>'+
+    '<div class="section-title">Historial</div>'+
+    (historial.length ? historial.map(h=>
+      '<div class="row"><div class="info"><div class="name">'+h.tipo+'</div><div class="meta">'+h.date+(h.nota?' · '+escapeHtml(h.nota):'')+'</div></div>'+
+      '<div class="amount" style="color:'+(h.monto<0?'var(--red)':'var(--green)')+';">'+(h.monto<0?'-':'+')+money(Math.abs(h.monto))+'</div></div>'
+    ).join('') : '<div class="empty">Sin movimientos todavía.</div>');
+}
+function closeSavingsAccountDetail(){
+  document.getElementById('cuenta-ahorro-detalle').classList.remove('active');
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.getElementById('cuentas-ahorro').classList.add('active');
+  document.querySelector('.tab[data-tab="cuentas-ahorro"]').classList.add('active');
 }
 
 function addSaving(){
@@ -958,7 +1004,7 @@ function openCardDetail(cardId){
     '<div class="label" style="font-size:12px;color:var(--muted);">Límite</div>'+
     '<div style="font-size:22px;font-weight:700;">'+money(card.limit||0)+'</div>'+
     '<div class="grid2" style="margin-top:10px;">'+
-    '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance inicial</div>'+
+    '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance</div>'+
     '<div style="font-size:22px;font-weight:700;color:#3E6B5C;">'+money(balance)+'</div></div>'+
     '<div><div class="label" style="font-size:12px;color:var(--muted);">Disponible</div>'+
     '<div style="font-size:22px;font-weight:700;color:#7BCBA0;">'+money(disponible)+'</div></div>'+
@@ -1094,12 +1140,12 @@ function render(){
   }).join('') : '<div class="empty">Aún no hay movimientos registrados por día.</div>';
 
   document.getElementById('savings-accounts-list').innerHTML = data.savingsAccounts.length ? data.savingsAccounts.map(x=>
-    '<div class="row"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div></div>'+
+    '<div class="row" style="cursor:pointer;" onclick="openSavingsAccountDetail(\''+x.id+'\')"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Toca para ver el historial</div></div>'+
     '<div class="actions"><div class="amount" style="color:'+((x.balance||0)>=0?'var(--green)':'var(--red)')+';">'+money(x.balance||0)+'</div>'+
-    '<button class="ghost" onclick="depositToSavingsAccount(\''+x.id+'\')" style="margin:0;">Depositar</button>'+
-    '<button class="ghost" onclick="withdrawFromSavingsAccount(\''+x.id+'\')" style="margin:0;">Retirar</button>'+
-    '<button class="ghost" onclick="editSavingsAccount(\''+x.id+'\')">Editar</button>'+
-    '<button class="secondary" onclick="deleteSavingsAccount(\''+x.id+'\')">Borrar</button></div></div>'
+    '<button class="ghost" onclick="event.stopPropagation();depositToSavingsAccount(\''+x.id+'\')" style="margin:0;">Depositar</button>'+
+    '<button class="ghost" onclick="event.stopPropagation();withdrawFromSavingsAccount(\''+x.id+'\')" style="margin:0;">Retirar</button>'+
+    '<button class="ghost" onclick="event.stopPropagation();editSavingsAccount(\''+x.id+'\')">Editar</button>'+
+    '<button class="secondary" onclick="event.stopPropagation();deleteSavingsAccount(\''+x.id+'\')">Borrar</button></div></div>'
   ).join('') : '<div class="empty">Aún no tienes cuentas de ahorro.</div>';
 
   document.getElementById('savings-list').innerHTML = data.savings.length ? data.savings.map(x=>{
