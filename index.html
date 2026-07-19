@@ -525,7 +525,16 @@ async function loadUserData(){
     if(!data.budgets) data.budgets = {};
     if(!data.currency) data.currency = 'USD';
     if(!data.savingsAccounts) data.savingsAccounts = [];
-    data.savingsAccounts.forEach(x=>{ if(!x.movements) x.movements = []; });
+    data.savingsAccounts.forEach(x=>{
+      if(!x.movements) x.movements = [];
+      if(x.name && !x.name.endsWith(' - Ahorro')){
+        const oldName = x.name;
+        x.name = oldName + ' - Ahorro';
+        data.daily.forEach(d=>{ if(d.account===oldName) d.account = x.name; });
+        data.income.forEach(i=>{ if(i.account===oldName) i.account = x.name; });
+        data.fixed.forEach(f=>{ if(f.account===oldName) f.account = x.name; });
+      }
+    });
     data.fixed.forEach(x=>{ if(!x.paidMonths){ x.paidMonths = x.paid ? [currentMonth()] : []; delete x.paid; } });
     data.cards.forEach(x=>{
       if(x.limit === undefined) x.limit = x.amount || 0;
@@ -533,6 +542,13 @@ async function loadUserData(){
       if(x.balance === undefined) x.balance = 0;
       if(!x.payments) x.payments = [];
       delete x.amount; delete x.paid; delete x.paidMonths;
+      if(x.name && !x.name.endsWith(' - Crédito')){
+        const oldName = x.name;
+        x.name = oldName + ' - Crédito';
+        data.daily.forEach(d=>{ if(d.account===oldName) d.account = x.name; });
+        data.income.forEach(i=>{ if(i.account===oldName) i.account = x.name; });
+        data.fixed.forEach(f=>{ if(f.account===oldName) f.account = x.name; });
+      }
     });
     showStatus('Datos cargados', 'ok');
   }catch(e){
@@ -801,7 +817,8 @@ function deleteIncome(id){
 
 let editingSavingsAccountId = null;
 function submitSavingsAccount(){
-  const name=document.getElementById('sa-name').value.trim();
+  let name=document.getElementById('sa-name').value.trim();
+  if(name && !name.endsWith(' - Ahorro')) name = name + ' - Ahorro';
   const balance=parseFloat(document.getElementById('sa-balance').value)||0;
   if(!name) return;
   if(editingSavingsAccountId){
@@ -818,7 +835,7 @@ function submitSavingsAccount(){
 function editSavingsAccount(id){
   const it = data.savingsAccounts.find(x=>x.id===id); if(!it) return;
   editingSavingsAccountId = id;
-  document.getElementById('sa-name').value = it.name;
+  document.getElementById('sa-name').value = it.name.replace(/ - Ahorro$/,'');
   document.getElementById('sa-balance').value = it.balance;
   document.getElementById('sa-submit').textContent = 'Guardar cambios';
   document.getElementById('sa-cancel').style.display = 'inline-block';
@@ -914,7 +931,8 @@ function deleteSaving(id){
 }
 
 function submitCard(){
-  const name=document.getElementById('c-name').value.trim();
+  let name=document.getElementById('c-name').value.trim();
+  if(name && !name.endsWith(' - Crédito')) name = name + ' - Crédito';
   const limit=parseFloat(document.getElementById('c-limit').value)||0;
   const cutoff=parseInt(document.getElementById('c-cutoff').value)||1;
   const day=parseInt(document.getElementById('c-day').value)||1;
@@ -937,7 +955,7 @@ function submitCard(){
 function editCard(id){
   const it = data.cards.find(x=>x.id===id); if(!it) return;
   editingCardId = id;
-  document.getElementById('c-name').value = it.name;
+  document.getElementById('c-name').value = it.name.replace(/ - Crédito$/,'');
   document.getElementById('c-limit').value = it.limit;
   document.getElementById('c-cutoff').value = it.cutoffDay;
   document.getElementById('c-day').value = it.day;
