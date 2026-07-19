@@ -1130,7 +1130,7 @@ function render(){
   const incomeThisMonth = data.income.filter(x=>x.date && x.date.slice(0,7)===month);
 
   const totalDaily = dailyThisMonth.reduce((s,x)=>s+x.amount,0);
-  const totalFixed = data.fixed.reduce((s,x)=>s+x.amount,0);
+  const totalFixed = data.fixed.filter(x=>(x.paidMonths||[]).includes(month)).reduce((s,x)=>s+x.amount,0);
   const totalGastos = totalDaily + totalFixed;
   const totalIngresos = incomeThisMonth.reduce((s,x)=>s+x.amount,0);
   const balance = totalIngresos - totalGastos;
