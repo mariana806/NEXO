@@ -8,14 +8,14 @@
 <meta http-equiv="Expires" content="0">
 <title>SYNK</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1B2F28">
+<meta name="theme-color" content="#1B1E1C">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
-    --ink:#E4EEE8; --ink-soft:#A9C4B7; --paper:#1B2F28; --paper-line:#3A5449;
-    --card:#25423A; --gold:#D9A54A; --gold-bg:#3A2F1C; --green:#6FBF97; --green-bg:#25422F;
-    --orange:#E0A05C; --orange-bg:#40301B; --red:#D98567; --red-bg:#402823; --muted:#8FAC9E;
-    --accent:#3E5A4E; --accent-soft:#4B6E60; --text-on-white:#1C2F28;
+    --ink:#F1F4F2; --ink-soft:#C3CBC7; --paper:#1B1E1C; --paper-line:#3E4440;
+    --card:#26302B; --gold:#E0AC54; --gold-bg:#3F331D; --green:#7BCBA0; --green-bg:#233A2E;
+    --orange:#E6AA63; --orange-bg:#453420; --red:#E08F70; --red-bg:#452B24; --muted:#9AA6A1;
+    --accent:#3E6B5C; --accent-soft:#4B7A69; --text-on-white:#1C2F28;
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:Arial,sans-serif;background:var(--paper);color:var(--ink);}
@@ -227,7 +227,7 @@
         <div><label>Fecha</label><input id="i-date" type="date"></div>
         <div><label>Monto</label><input id="i-amount" type="number" step="0.01" placeholder="0"></div>
       </div>
-      <label>¿A qué cuenta/tarjeta entró?</label><select id="i-account"></select>
+      <label>Tipo de banco</label><select id="i-account"></select>
       <label>Nota (opcional)</label><input id="i-note" placeholder="fuente del ingreso">
       <div class="actions">
         <button id="i-submit" onclick="submitIncome()">Agregar ingreso</button>
@@ -959,9 +959,9 @@ function openCardDetail(cardId){
     '<div style="font-size:22px;font-weight:700;">'+money(card.limit||0)+'</div>'+
     '<div class="grid2" style="margin-top:10px;">'+
     '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance inicial</div>'+
-    '<div style="font-size:22px;font-weight:700;color:#3E5A4E;">'+money(balance)+'</div></div>'+
+    '<div style="font-size:22px;font-weight:700;color:#3E6B5C;">'+money(balance)+'</div></div>'+
     '<div><div class="label" style="font-size:12px;color:var(--muted);">Disponible</div>'+
-    '<div style="font-size:22px;font-weight:700;color:#6FBF97;">'+money(disponible)+'</div></div>'+
+    '<div style="font-size:22px;font-weight:700;color:#7BCBA0;">'+money(disponible)+'</div></div>'+
     '</div>'+
     '<div class="meta" style="margin-top:6px;">Fecha de corte: día '+card.cutoffDay+' · Fecha de pago: día '+card.day+'</div>'+
     '<button onclick="makeCardPayment(\''+card.id+'\')">Hacer un pago</button></div>'+
