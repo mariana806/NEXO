@@ -8,13 +8,14 @@
 <meta http-equiv="Expires" content="0">
 <title>SYNK</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1E3D36">
+<meta name="theme-color" content="#1C1F22">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
-    --ink:#1E3D36; --ink-soft:#4F7268; --paper:#F1F5EE; --paper-line:#DCE6DA;
-    --card:#FFFFFF; --gold:#C08A2E; --gold-bg:#F7ECD6; --green:#3C8361; --green-bg:#E3F1E9;
-    --orange:#D9954A; --orange-bg:#FBEEDD; --red:#A65036; --red-bg:#F3E6E1; --muted:#7C8F86;
+    --ink:#E9EDEE; --ink-soft:#A9B8BA; --paper:#1C1F22; --paper-line:#3A4245;
+    --card:#262B2F; --gold:#D9A54A; --gold-bg:#3A2F1C; --green:#5FBF8F; --green-bg:#20342B;
+    --orange:#E0A05C; --orange-bg:#40301B; --red:#D98567; --red-bg:#402823; --muted:#8FA0A2;
+    --accent:#2E7E7E; --accent-soft:#3A9494; --text-on-white:#1C2F28;
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:Arial,sans-serif;background:var(--paper);color:var(--ink);}
@@ -23,22 +24,22 @@
   .sub{color:var(--muted);font-size:13px;margin:0 0 18px;}
   .tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;border-bottom:2px solid var(--paper-line);padding-bottom:10px;}
   .tab{padding:7px 13px;border-radius:6px;font-size:13px;cursor:pointer;background:transparent;border:1px solid transparent;color:var(--ink-soft);}
-  .tab.active{background:var(--ink);color:#fff;}
+  .tab.active{background:var(--accent);color:#fff;}
   .panel{display:none;}
   .panel.active{display:block;}
   .card{background:var(--card);border:1px solid var(--paper-line);border-radius:10px;padding:16px;margin-bottom:14px;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .stat{background:#EFEBFA;border-radius:8px;padding:12px 14px;}
+  .stat{background:var(--accent);border-radius:8px;padding:12px 14px;}
   .stat .label{font-size:12px;color:var(--muted);margin-bottom:4px;}
   .stat .value{font-size:20px;font-weight:700;}
   label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;margin-top:8px;}
-  input,select{width:100%;padding:8px 9px;border:1px solid var(--paper-line);border-radius:6px;font-size:14px;background:#fff;color:var(--ink);}
+  input,select{width:100%;padding:8px 9px;border:1px solid var(--paper-line);border-radius:6px;font-size:14px;background:#fff;color:var(--text-on-white);}
   input[type=checkbox]{width:auto;}
-  button{background:var(--ink);color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer;margin-top:12px;}
+  button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer;margin-top:12px;}
   button.secondary{background:transparent;color:var(--red);border:1px solid var(--red);padding:5px 10px;font-size:12px;margin:0;}
   button.ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--paper-line);padding:5px 10px;font-size:12px;margin:0;}
   button.google{background:#fff;color:#3c4043;border:1px solid var(--paper-line);}
-  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--paper-line);border-radius:8px;margin-bottom:8px;background:#fff;}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--paper-line);border-radius:8px;margin-bottom:8px;background:var(--card);color:var(--ink);}
   .row.paid{background:var(--green-bg);border-color:var(--green);}
   .row .info{flex:1;min-width:0;}
   .row .name{font-weight:600;font-size:14px;}
@@ -46,7 +47,7 @@
   .row .amount{font-weight:700;font-size:15px;white-space:nowrap;}
   .stamp{font-size:10px;font-weight:700;color:var(--green);border:2px solid var(--green);border-radius:4px;padding:2px 6px;display:inline-block;letter-spacing:0.5px;}
   .cat-pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--gold-bg);color:var(--gold);font-weight:600;margin-right:6px;}
-  .progress-outer{background:#E7E2F5;border-radius:6px;height:10px;overflow:hidden;margin-top:6px;}
+  .progress-outer{background:var(--paper-line);border-radius:6px;height:10px;overflow:hidden;margin-top:6px;}
   .progress-inner{height:100%;background:var(--green);}
   .progress-inner.over{background:var(--red);}
   .progress-inner.mid{background:var(--orange);}
@@ -58,12 +59,12 @@
   .amt-red{color:var(--red);}
   .amt-orange{color:var(--orange);}
   .amt-green{color:var(--green);}
-  #status-bar{position:sticky;top:0;z-index:50;text-align:center;font-size:12px;padding:5px;color:#fff;background:var(--ink-soft);display:none;}
+  #status-bar{position:sticky;top:0;z-index:50;text-align:center;font-size:12px;padding:5px;color:#fff;background:var(--accent-soft);display:none;}
   #status-bar.show{display:block;}
   #status-bar.error{background:var(--red);}
   #status-bar.ok{background:var(--green);}
   #auth-screen{position:fixed;inset:0;background:var(--paper);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;overflow-y:auto;}
-  #lock-box{max-width:340px;width:100%;background:#fff;border:1px solid var(--paper-line);border-radius:12px;padding:24px;text-align:center;margin:20px 0;}
+  #lock-box{max-width:340px;width:100%;background:var(--card);color:var(--ink);border:1px solid var(--paper-line);border-radius:12px;padding:24px;text-align:center;margin:20px 0;}
   #app-content{display:none;}
   .cat-tag{display:inline-flex;align-items:center;gap:6px;background:var(--gold-bg);color:var(--gold);border-radius:14px;padding:4px 10px;font-size:12px;font-weight:600;margin:0 6px 6px 0;}
   .cat-tag button{margin:0;background:transparent;color:var(--red);border:none;padding:0;font-size:14px;line-height:1;}
@@ -126,7 +127,7 @@
 </div>
 
 <div id="privacy-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:120;padding:20px;">
-  <div style="max-width:480px;width:100%;background:#fff;border-radius:12px;padding:24px;max-height:80vh;overflow-y:auto;">
+  <div style="max-width:480px;width:100%;background:var(--card);color:var(--ink);border-radius:12px;padding:24px;max-height:80vh;overflow-y:auto;">
     <h2 style="margin-top:0;font-size:18px;">Privacidad y términos</h2>
     <p style="font-size:13px;line-height:1.6;color:var(--ink-soft);">
       SYNK guarda la información que ingresas (nombre, correo, fecha de nacimiento, y tus registros de gastos, ingresos y ahorros) en una base de datos privada, protegida con tu cuenta y contraseña. Nadie más puede ver tus datos financieros — cada cuenta solo tiene acceso a su propia información.<br><br>
@@ -953,9 +954,9 @@ function openCardDetail(cardId){
     '<div style="font-size:22px;font-weight:700;">'+money(card.limit||0)+'</div>'+
     '<div class="grid2" style="margin-top:10px;">'+
     '<div><div class="label" style="font-size:12px;color:var(--muted);">Balance inicial</div>'+
-    '<div style="font-size:22px;font-weight:700;color:#1E3D36;">'+money(balance)+'</div></div>'+
+    '<div style="font-size:22px;font-weight:700;color:#2E7E7E;">'+money(balance)+'</div></div>'+
     '<div><div class="label" style="font-size:12px;color:var(--muted);">Disponible</div>'+
-    '<div style="font-size:22px;font-weight:700;color:#3C8361;">'+money(disponible)+'</div></div>'+
+    '<div style="font-size:22px;font-weight:700;color:#5FBF8F;">'+money(disponible)+'</div></div>'+
     '</div>'+
     '<div class="meta" style="margin-top:6px;">Fecha de corte: día '+card.cutoffDay+' · Fecha de pago: día '+card.day+'</div>'+
     '<button onclick="makeCardPayment(\''+card.id+'\')">Hacer un pago</button></div>'+
