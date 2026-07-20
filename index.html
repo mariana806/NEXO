@@ -165,6 +165,7 @@
     <div class="tab" data-tab="ahorros">Metas de ahorro</div>
     <div class="tab" data-tab="cuentas-ahorro">Cuentas</div>
     <div class="tab" data-tab="tarjetas">Tarjetas</div>
+    <div class="tab" data-tab="inversiones">Inversiones</div>
     <div class="tab" data-tab="presupuestos">Presupuestos</div>
     <div class="tab" data-tab="ajustes">Ajustes</div>
   </div>
@@ -188,6 +189,8 @@
     <div id="accounts-summary"></div>
     <div class="section-title">Ahorro</div>
     <div id="savings-summary"></div>
+    <div class="section-title">Inversiones</div>
+    <div id="investments-summary"></div>
     <div class="section-title">Pendientes de pago (gastos fijos)</div>
     <div id="pendientes-list"></div>
     <div class="section-title">Gasto de categoría mensual</div>
@@ -330,6 +333,26 @@
     <div id="card-detail-content"></div>
   </div>
 
+  <div id="inversiones" class="panel">
+    <div class="card">
+      <div class="grid2">
+        <div><label>Nombre de la inversión</label><input id="inv-name" placeholder="Acciones, CDT, cripto..."></div>
+        <div><label>Monto invertido</label><input id="inv-amount" type="number" step="0.01" placeholder="0"></div>
+      </div>
+      <div class="actions">
+        <button id="inv-submit" onclick="submitInvestment()">Agregar inversión</button>
+        <button class="ghost" id="inv-cancel" style="display:none;" onclick="cancelEditInvestment()">Cancelar</button>
+      </div>
+    </div>
+    <div class="section-title">Tus inversiones</div>
+    <div id="investments-list"></div>
+  </div>
+
+  <div id="inversion-detalle" class="panel">
+    <button class="ghost" onclick="closeInvestmentDetail()">← Volver a inversiones</button>
+    <div id="investment-detail-content"></div>
+  </div>
+
   <div id="cuenta-detalle" class="panel">
     <button class="ghost" onclick="closeAccountDetail()">← Volver a Ajustes</button>
     <h2 style="margin:10px 0 4px;">Cuenta</h2>
@@ -421,7 +444,7 @@ const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DEFAULT_CATS = ['Comida','Transporte','Servicios','Salud','Vivienda','Otros'];
 function defaultData(){
-  return { fixed: [], daily: [], income: [], savings: [], cards: [], savingsAccounts: [], budgets: {}, categories: DEFAULT_CATS.slice(), currency: 'USD' };
+  return { fixed: [], daily: [], income: [], savings: [], cards: [], savingsAccounts: [], investments: [], budgets: {}, categories: DEFAULT_CATS.slice(), currency: 'USD' };
 }
 let data = defaultData();
 let currentUserId = null;
@@ -635,6 +658,8 @@ async function loadUserData(){
     Object.keys(data.budgets||{}).forEach(k=>{ newBudgets[k.trim()] = data.budgets[k]; });
     data.budgets = newBudgets;
     if(!data.savingsAccounts) data.savingsAccounts = [];
+    if(!data.investments) data.investments = [];
+    data.investments.forEach(x=>{ if(!x.movements) x.movements = []; });
     data.savings.forEach(x=>{ if(!x.movements) x.movements = []; });
     data.savingsAccounts.forEach(x=>{
       if(!x.movements) x.movements = [];
@@ -1153,6 +1178,109 @@ function closeSavingsAccountDetail(){
   document.querySelector('.tab[data-tab="cuentas-ahorro"]').classList.add('active');
 }
 
+let editingInvestmentId = null;
+function submitInvestment(){
+  const name=document.getElementById('inv-name').value.trim();
+  const amount=parseFloat(document.getElementById('inv-amount').value)||0;
+  if(!name) return;
+  if(editingInvestmentId){
+    const it = data.investments.find(x=>x.id===editingInvestmentId);
+    it.name = name;
+    cancelEditInvestment();
+  }else{
+    data.investments.push({id:uid(), name, invertido:amount, valorActual:amount, movements:[{id:uid(), date:new Date().toISOString().slice(0,10), tipo:'Inversión inicial', amount}]});
+  }
+  document.getElementById('inv-name').value='';
+  document.getElementById('inv-amount').value='';
+  saveData(); render();
+}
+function editInvestment(id){
+  const it = data.investments.find(x=>x.id===id); if(!it) return;
+  editingInvestmentId = id;
+  document.getElementById('inv-name').value = it.name;
+  document.getElementById('inv-amount').value = '';
+  document.getElementById('inv-submit').textContent = 'Guardar nombre';
+  document.getElementById('inv-cancel').style.display = 'inline-block';
+}
+function cancelEditInvestment(){
+  editingInvestmentId = null;
+  document.getElementById('inv-submit').textContent = 'Agregar inversión';
+  document.getElementById('inv-cancel').style.display = 'none';
+}
+function deleteInvestment(id){
+  if(!confirm('¿Borrar esta inversión? Se pierde su historial.')) return;
+  data.investments = data.investments.filter(x=>x.id!==id);
+  saveData(); render();
+}
+function addInvestmentContribution(id){
+  const amt = parseFloat(prompt('¿Cuánto vas a aportar a esta inversión?'));
+  if(!amt || amt<=0) return;
+  const it = data.investments.find(x=>x.id===id); if(!it) return;
+  it.invertido = (it.invertido||0) + amt;
+  it.valorActual = (it.valorActual||0) + amt;
+  if(!it.movements) it.movements = [];
+  it.movements.push({id:uid(), date:new Date().toISOString().slice(0,10), tipo:'Aporte', amount: amt});
+  saveData(); render();
+  openInvestmentDetail(id);
+}
+function updateInvestmentValue(id){
+  const it = data.investments.find(x=>x.id===id); if(!it) return;
+  const val = parseFloat(prompt('¿Cuál es el valor actual de esta inversión?', it.valorActual||0));
+  if(isNaN(val)) return;
+  const delta = val - (it.valorActual||0);
+  it.valorActual = val;
+  if(!it.movements) it.movements = [];
+  it.movements.push({id:uid(), date:new Date().toISOString().slice(0,10), tipo:'Actualización de valor', amount: delta});
+  saveData(); render();
+  openInvestmentDetail(id);
+}
+function deleteInvestmentMovement(invId, movId){
+  const it = data.investments.find(x=>x.id===invId); if(!it) return;
+  const mov = (it.movements||[]).find(m=>m.id===movId); if(!mov) return;
+  if(!confirm('¿Borrar este movimiento?')) return;
+  if(mov.tipo === 'Aporte' || mov.tipo === 'Inversión inicial'){
+    it.invertido = (it.invertido||0) - mov.amount;
+    it.valorActual = (it.valorActual||0) - mov.amount;
+  }else{
+    it.valorActual = (it.valorActual||0) - mov.amount;
+  }
+  it.movements = it.movements.filter(m=>m.id!==movId);
+  saveData(); render();
+  openInvestmentDetail(invId);
+}
+function openInvestmentDetail(id){
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.getElementById('inversion-detalle').classList.add('active');
+  const it = data.investments.find(x=>x.id===id);
+  if(!it) return;
+  const ganancia = (it.valorActual||0) - (it.invertido||0);
+  const historial = (it.movements||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('investment-detail-content').innerHTML =
+    '<h2 style="margin:10px 0 4px;">'+escapeHtml(it.name)+'</h2>'+
+    '<div class="card">'+
+    '<div class="grid2">'+
+    '<div class="stat"><div class="label">Invertido</div><div class="value">'+money(it.invertido||0)+'</div></div>'+
+    '<div class="stat"><div class="label">Valor actual</div><div class="value">'+money(it.valorActual||0)+'</div></div>'+
+    '</div>'+
+    '<div class="label" style="font-size:12px;color:var(--muted);margin-top:10px;">'+(ganancia>=0?'Ganancia':'Pérdida')+'</div>'+
+    '<div style="font-size:22px;font-weight:700;color:'+(ganancia>=0?'var(--green)':'var(--red)')+';">'+(ganancia>=0?'+':'')+money(ganancia)+'</div>'+
+    '<div class="actions" style="margin-top:8px;"><button onclick="addInvestmentContribution(\''+it.id+'\')" style="margin:0;">Agregar aporte</button>'+
+    '<button class="ghost" onclick="updateInvestmentValue(\''+it.id+'\')">Actualizar valor</button></div></div>'+
+    '<div class="section-title">Historial</div>'+
+    (historial.length ? historial.map(h=>
+      '<div class="row"><div class="info"><div class="name">'+h.tipo+'</div><div class="meta">'+h.date+'</div></div>'+
+      '<div class="actions"><div class="amount" style="color:'+(h.amount<0?'var(--red)':'var(--green)')+';">'+(h.amount<0?'-':'+')+money(Math.abs(h.amount))+'</div>'+
+      '<button class="secondary" onclick="deleteInvestmentMovement(\''+it.id+'\',\''+h.id+'\')">Borrar</button></div></div>'
+    ).join('') : '<div class="empty">Sin movimientos todavía.</div>');
+}
+function closeInvestmentDetail(){
+  document.getElementById('inversion-detalle').classList.remove('active');
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.getElementById('inversiones').classList.add('active');
+  document.querySelector('.tab[data-tab="inversiones"]').classList.add('active');
+}
+
 function addSaving(){
   const name=document.getElementById('s-name').value.trim();
   const goal=parseFloat(document.getElementById('s-goal').value)||0;
@@ -1366,7 +1494,8 @@ function render(){
   const totalIngresos = incomeThisMonth.reduce((s,x)=>s+x.amount,0);
   const totalSavingsAccountBalance = data.savingsAccounts.reduce((s,a)=>s+(a.balance||0),0);
   const totalAhorradoMetas = data.savings.reduce((s,g)=>s+(g.current||0),0);
-  const balance = totalIngresos - totalGastos + totalSavingsAccountBalance + totalAhorradoMetas;
+  const totalValorActual = data.investments.reduce((s,x)=>s+(x.valorActual||0),0);
+  const balance = totalIngresos - totalGastos + totalSavingsAccountBalance + totalAhorradoMetas + totalValorActual;
 
   document.getElementById('stat-ingresos').textContent = money(totalIngresos);
   document.getElementById('stat-gastos').textContent = money(totalGastos);
@@ -1424,6 +1553,17 @@ function render(){
     '<div class="label" style="font-size:12px;color:var(--muted);">Total ahorrado</div>'+
     '<div style="font-size:22px;font-weight:700;color:var(--green);">'+money(totalAhorradoMetas)+'</div>'+
     '</div>' : '<div class="empty">Aún no tienes metas de ahorro.</div>';
+
+  const totalInvertido = data.investments.reduce((s,x)=>s+(x.invertido||0),0);
+  const totalGanancia = totalValorActual - totalInvertido;
+  document.getElementById('investments-summary').innerHTML = data.investments.length ?
+    '<div class="card" style="cursor:pointer;" onclick="switchTab(\'inversiones\')">'+
+    '<div class="grid2">'+
+    '<div><div class="label" style="font-size:12px;color:var(--muted);">Valor actual</div>'+
+    '<div style="font-size:22px;font-weight:700;color:var(--green);">'+money(totalValorActual)+'</div></div>'+
+    '<div><div class="label" style="font-size:12px;color:var(--muted);">'+(totalGanancia>=0?'Ganancia':'Pérdida')+'</div>'+
+    '<div style="font-size:22px;font-weight:700;color:'+(totalGanancia>=0?'var(--green)':'var(--red)')+';">'+(totalGanancia>=0?'+':'')+money(totalGanancia)+'</div></div>'+
+    '</div></div>' : '<div class="empty">Aún no tienes inversiones registradas.</div>';
 
   const pendList = document.getElementById('pendientes-list');
   const pendItems = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({id:x.id, name:x.name, amount:x.amount, day:x.day, type:'fijo'})).sort((a,b)=>a.day-b.day);
@@ -1522,6 +1662,15 @@ function render(){
     '<div class="actions"><button class="ghost" onclick="event.stopPropagation();editCard(\''+x.id+'\')">Editar</button>'+
     '<button class="secondary" onclick="event.stopPropagation();deleteCard(\''+x.id+'\')">Borrar</button></div></div>';
   }).join('') : '<div class="empty">Aún no hay tarjetas registradas.</div>';
+
+  document.getElementById('investments-list').innerHTML = data.investments.length ? data.investments.map(x=>{
+    const ganancia = (x.valorActual||0) - (x.invertido||0);
+    return '<div class="row" style="cursor:pointer;" onclick="openInvestmentDetail(\''+x.id+'\')"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div>'+
+    '<div class="meta">Invertido '+money(x.invertido||0)+' · Valor actual '+money(x.valorActual||0)+'</div></div>'+
+    '<div class="actions"><div class="amount" style="color:'+(ganancia>=0?'var(--green)':'var(--red)')+';">'+(ganancia>=0?'+':'')+money(ganancia)+'</div>'+
+    '<button class="ghost" onclick="event.stopPropagation();editInvestment(\''+x.id+'\')">Editar</button>'+
+    '<button class="secondary" onclick="event.stopPropagation();deleteInvestment(\''+x.id+'\')">Borrar</button></div></div>';
+  }).join('') : '<div class="empty">Aún no hay inversiones registradas.</div>';
 
   document.getElementById('cat-tags').innerHTML = data.categories.map(c=>
     '<span class="cat-tag">'+escapeHtml(c)+'<button onclick="deleteCategory(\''+c.replace(/'/g,"\\'")+'\')">✕</button></span>'
