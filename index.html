@@ -940,6 +940,10 @@ function cancelEditFixed(){
   document.getElementById('f-submit').textContent = 'Agregar gasto fijo';
   document.getElementById('f-cancel').style.display = 'none';
 }
+function payFixedFromResumen(id){
+  toggleFixedPaid(id);
+  switchTab('fijos');
+}
 function toggleFixedPaid(id){
   const it = data.fixed.find(x=>x.id===id); if(!it) return;
   if(!it.paidMonths) it.paidMonths = [];
@@ -1411,9 +1415,10 @@ function render(){
     '</div>' : '<div class="empty">Aún no tienes metas de ahorro.</div>';
 
   const pendList = document.getElementById('pendientes-list');
-  const pendItems = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({name:x.name, amount:x.amount, day:x.day, type:'fijo'})).sort((a,b)=>a.day-b.day);
+  const pendItems = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({id:x.id, name:x.name, amount:x.amount, day:x.day, type:'fijo'})).sort((a,b)=>a.day-b.day);
   pendList.innerHTML = pendItems.length ? pendItems.map(x=>
-    '<div class="row '+dueClass(x.day)+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+(dueClass(x.day)==='overdue'?' · atrasado':dueClass(x.day)==='due-soon'?' · vence pronto':'')+'</div></div><div class="amount">'+money(x.amount)+'</div></div>'
+    '<div class="row '+dueClass(x.day)+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+(dueClass(x.day)==='overdue'?' · atrasado':dueClass(x.day)==='due-soon'?' · vence pronto':'')+'</div></div>'+
+    '<div class="actions"><div class="amount">'+money(x.amount)+'</div><button onclick="payFixedFromResumen(\''+x.id+'\')" style="margin:0;">Pagar</button></div></div>'
   ).join('') : '<div class="empty">No hay pagos pendientes.</div>';
 
   const totalCardBalance = data.cards.reduce((s,c)=>s+cardBalance(c),0);
