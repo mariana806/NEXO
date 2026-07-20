@@ -1117,7 +1117,7 @@ function openSavingsAccountDetail(id){
   const acc = data.savingsAccounts.find(x=>x.id===id);
   if(!acc) return;
   const historial = [
-    ...(acc.movements||[]).map(m=>({date:m.date, tipo:m.tipo, monto:m.amount})),
+    ...(acc.movements||[]).map(m=>({date:m.date, tipo:m.tipo, monto:m.amount, movId:m.id})),
     ...data.daily.filter(d=>d.account===acc.name).map(d=>({date:d.date, tipo:'Gasto', monto:-d.amount, nota:d.note||d.category})),
     ...data.income.filter(i=>i.account===acc.name).map(i=>({date:i.date, tipo:'Ingreso', monto:i.amount, nota:i.note})),
     ...data.fixed.filter(f=>f.account===acc.name).flatMap(f=>(f.paidMonths||[]).map(m=>({date:m+'-'+String(f.day).padStart(2,'0'), tipo:'Gasto fijo', monto:-f.amount, nota:f.name})))
@@ -1132,8 +1132,19 @@ function openSavingsAccountDetail(id){
     '<div class="section-title">Historial</div>'+
     (historial.length ? historial.map(h=>
       '<div class="row"><div class="info"><div class="name">'+h.tipo+'</div><div class="meta">'+h.date+(h.nota?' · '+escapeHtml(h.nota):'')+'</div></div>'+
-      '<div class="amount" style="color:'+(h.monto<0?'var(--red)':'var(--green)')+';">'+(h.monto<0?'-':'+')+money(Math.abs(h.monto))+'</div></div>'
+      '<div class="actions"><div class="amount" style="color:'+(h.monto<0?'var(--red)':'var(--green)')+';">'+(h.monto<0?'-':'+')+money(Math.abs(h.monto))+'</div>'+
+      (h.movId ? '<button class="secondary" onclick="deleteSavingsAccountMovement(\''+acc.id+'\',\''+h.movId+'\')">Borrar</button>' : '')+
+      '</div></div>'
     ).join('') : '<div class="empty">Sin movimientos todavía.</div>');
+}
+function deleteSavingsAccountMovement(accId, movId){
+  const acc = data.savingsAccounts.find(x=>x.id===accId); if(!acc) return;
+  const mov = (acc.movements||[]).find(m=>m.id===movId); if(!mov) return;
+  if(!confirm('¿Borrar este movimiento? El balance se ajusta solo.')) return;
+  acc.balance = (acc.balance||0) - mov.amount;
+  acc.movements = acc.movements.filter(m=>m.id!==movId);
+  saveData(); render();
+  openSavingsAccountDetail(accId);
 }
 function closeSavingsAccountDetail(){
   document.getElementById('cuenta-ahorro-detalle').classList.remove('active');
