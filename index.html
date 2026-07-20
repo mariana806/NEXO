@@ -618,9 +618,7 @@ function buildAccountOptions(){
   return '<option>Efectivo</option>' + data.cards.map(c=>'<option>'+escapeHtml(c.name)+'</option>').join('') + data.savingsAccounts.map(s=>'<option>'+escapeHtml(s.name)+'</option>').join('');
 }
 function buildSavingsAccountOptions(){
-  return data.savingsAccounts.length
-    ? data.savingsAccounts.map(s=>'<option>'+escapeHtml(s.name)+'</option>').join('')
-    : '<option value="">No tienes cuentas de ahorro creadas</option>';
+  return '<option>Efectivo</option>' + data.savingsAccounts.map(s=>'<option>'+escapeHtml(s.name)+'</option>').join('');
 }
 function fillAccountSelects(){
   const options = buildAccountOptions();
