@@ -983,6 +983,7 @@ function quickAddSavingsDeposit(id){
   const amt = parseFloat(document.getElementById('qa-amount-'+id).value);
   const account = document.getElementById('qa-account-'+id).value;
   if(!amt || amt<=0) return;
+  if(!account){ alert('Primero crea una cuenta de ahorro en la pestaña Cuentas.'); return; }
   goal.current = (goal.current||0) + amt;
   if(!goal.movements) goal.movements = [];
   goal.movements.push({id:uid(), date:new Date().toISOString().slice(0,10), amount: amt, account});
@@ -1286,7 +1287,7 @@ function render(){
     '<div class="progress-outer"><div class="progress-inner '+barClass+'" style="width:'+Math.min(100,p)+'%;"></div></div>'+
     '<div class="grid2" style="margin-top:8px;" onclick="event.stopPropagation();">'+
     '<input id="qa-amount-'+x.id+'" type="number" step="0.01" placeholder="Monto" style="margin:0;">'+
-    '<select id="qa-account-'+x.id+'" style="margin:0;">'+buildAccountOptions()+'</select>'+
+    '<select id="qa-account-'+x.id+'" style="margin:0;">'+buildSavingsAccountOptions()+'</select>'+
     '</div>'+
     '<div class="actions" style="margin-top:8px;" onclick="event.stopPropagation();">'+
     '<button onclick="quickAddSavingsDeposit(\''+x.id+'\')" style="margin:0;">Agregar dinero</button>'+
