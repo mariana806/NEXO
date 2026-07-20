@@ -10,6 +10,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1B1E1C">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --ink:#F1F4F2; --ink-soft:#C3CBC7; --paper:#1B1E1C; --paper-line:#3E4440;
@@ -140,7 +141,6 @@
 <div id="app-content">
 <div class="app">
   <h1>SYNK</h1>
-  <p class="sub">Gastos, ingresos y ahorros del mes</p>
 
   <div class="tabs">
     <div class="tab active" data-tab="resumen">Resumen</div>
@@ -156,7 +156,10 @@
   </div>
 
   <div id="resumen" class="panel active">
-    <h2 id="greeting-msg"></h2>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
+      <h2 id="greeting-msg" style="margin:0;"></h2>
+      <span id="greeting-date" style="font-size:12px;color:var(--muted);"></span>
+    </div>
     <div class="grid2">
       <div class="stat"><div class="label">Ingresos mensuales</div><div class="value" id="stat-ingresos">$0</div></div>
       <div class="stat"><div class="label">Gastos mensuales</div><div class="value" id="stat-gastos">$0</div></div>
@@ -335,6 +338,26 @@
       <button class="secondary" onclick="handleSignOut()">Cerrar sesión</button>
     </div>
     <div class="card">
+      <div class="section-title" style="margin-top:0;">Editar nombre</div>
+      <label>Nombre</label><input id="acc-firstname">
+      <label>Apellido</label><input id="acc-lastname">
+      <button onclick="updateAccountName()">Guardar nombre</button>
+      <p id="acc-name-msg" style="font-size:12px;margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Cambiar correo</div>
+      <label>Nuevo correo</label><input id="acc-new-email" type="email" placeholder="nuevo@correo.com">
+      <button onclick="updateAccountEmail()">Actualizar correo</button>
+      <p id="acc-email-msg" style="font-size:12px;margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Cambiar contraseña</div>
+      <label>Contraseña actual</label><input id="acc-current-password" type="password">
+      <label>Contraseña nueva</label><input id="acc-new-password" type="password" placeholder="Mínimo 6 caracteres">
+      <button onclick="updateAccountPassword()">Actualizar contraseña</button>
+      <p id="acc-password-msg" style="font-size:12px;margin-top:8px;"></p>
+    </div>
+    <div class="card">
       <div class="section-title" style="margin-top:0;">Copia de seguridad</div>
       <p class="sub">Descarga tus datos por si acaso, o restáuralos desde un archivo guardado antes.</p>
       <div class="actions">
@@ -342,6 +365,8 @@
         <button class="ghost" onclick="document.getElementById('restore-file').click()">Restaurar copia</button>
       </div>
       <input type="file" id="restore-file" accept="application/json" style="display:none;" onchange="restoreBackup(event)">
+      <p class="sub" style="margin-top:12px;">Descarga toda tu información organizada en un Excel.</p>
+      <button onclick="downloadExcel()">Descargar Excel</button>
     </div>
   </div>
 
@@ -421,6 +446,10 @@ function displayAccountInfo(email, meta){
   else if(meta && meta.name) name = meta.name;
   currentUserName = name ? name.split(' ')[0] : (email ? email.split('@')[0] : '');
   document.getElementById('account-email').textContent = name ? (name + ' · ' + email) : email;
+  if(document.getElementById('acc-firstname')){
+    document.getElementById('acc-firstname').value = (p && p.nombre) ? p.nombre : '';
+    document.getElementById('acc-lastname').value = (p && p.apellido) ? p.apellido : '';
+  }
 }
 
 async function initAuth(){
@@ -668,6 +697,85 @@ function switchTab(tabName){
   document.getElementById(tabName).classList.add('active');
   const tabEl = document.querySelector('.tab[data-tab="'+tabName+'"]');
   if(tabEl) tabEl.classList.add('active');
+}
+
+async function updateAccountName(){
+  const firstName = document.getElementById('acc-firstname').value.trim();
+  const lastName = document.getElementById('acc-lastname').value.trim();
+  const msg = document.getElementById('acc-name-msg');
+  if(!firstName || !lastName){ msg.style.color='var(--red)'; msg.textContent='Escribe nombre y apellido.'; return; }
+  data.profile = Object.assign(data.profile||{}, {nombre:firstName, apellido:lastName});
+  await saveData();
+  const { data: sessionData } = await supa.auth.getSession();
+  displayAccountInfo(sessionData.session.user.email, sessionData.session.user.user_metadata);
+  msg.style.color='var(--green)'; msg.textContent='Nombre actualizado.';
+}
+
+async function updateAccountEmail(){
+  const newEmail = document.getElementById('acc-new-email').value.trim();
+  const msg = document.getElementById('acc-email-msg');
+  msg.textContent='';
+  if(!newEmail){ msg.style.color='var(--red)'; msg.textContent='Escribe el correo nuevo.'; return; }
+  const { error } = await supa.auth.updateUser({ email: newEmail });
+  if(error){ msg.style.color='var(--red)'; msg.textContent=error.message; return; }
+  msg.style.color='var(--green)';
+  msg.textContent='Revisa tu correo actual y el nuevo — te enviamos un link de confirmación a ambos. El cambio no se aplica hasta que confirmes.';
+  document.getElementById('acc-new-email').value='';
+}
+
+async function updateAccountPassword(){
+  const currentPassword = document.getElementById('acc-current-password').value;
+  const newPassword = document.getElementById('acc-new-password').value;
+  const msg = document.getElementById('acc-password-msg');
+  msg.textContent='';
+  if(newPassword.length < 6){ msg.style.color='var(--red)'; msg.textContent='La contraseña nueva debe tener al menos 6 caracteres.'; return; }
+  const { data: sessionData } = await supa.auth.getSession();
+  const email = sessionData.session.user.email;
+  const { error: reauthError } = await supa.auth.signInWithPassword({ email, password: currentPassword });
+  if(reauthError){ msg.style.color='var(--red)'; msg.textContent='Tu contraseña actual no es correcta.'; return; }
+  const { error } = await supa.auth.updateUser({ password: newPassword });
+  if(error){ msg.style.color='var(--red)'; msg.textContent=error.message; return; }
+  msg.style.color='var(--green)'; msg.textContent='Contraseña actualizada.';
+  document.getElementById('acc-current-password').value='';
+  document.getElementById('acc-new-password').value='';
+}
+
+function downloadExcel(){
+  const wb = XLSX.utils.book_new();
+  const month = currentMonth();
+
+  const resumenRows = [
+    {Concepto:'Ingresos mensuales', Monto: data.income.filter(i=>i.date&&i.date.slice(0,7)===month).reduce((s,i)=>s+i.amount,0)},
+    {Concepto:'Gastos mensuales', Monto: data.daily.filter(d=>d.date&&d.date.slice(0,7)===month).reduce((s,d)=>s+d.amount,0) + data.fixed.filter(f=>(f.paidMonths||[]).includes(month)).reduce((s,f)=>s+f.amount,0)},
+    {Concepto:'Balance de tarjetas (deben)', Monto: data.cards.reduce((s,c)=>s+cardBalance(c),0)},
+    {Concepto:'Disponible en tarjetas', Monto: data.cards.reduce((s,c)=>s+((c.limit||0)-cardBalance(c)),0)},
+    {Concepto:'Balance en cuentas de ahorro', Monto: data.savingsAccounts.reduce((s,a)=>s+(a.balance||0),0)},
+    {Concepto:'Total ahorrado en metas', Monto: data.savings.reduce((s,g)=>s+(g.current||0),0)},
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows), 'Resumen');
+
+  const fixedRows = data.fixed.map(x=>({Nombre:x.name, Categoria:x.category, Monto:x.amount, DiaVencimiento:x.day, MetodoPago:x.account||'Efectivo', MesesPagados:(x.paidMonths||[]).join(', ')}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fixedRows), 'Gastos Fijos');
+
+  const dailyRows = data.daily.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>({Fecha:x.date, Categoria:x.category, Monto:x.amount, Cuenta:x.account||'Efectivo', Nota:x.note||''}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dailyRows), 'Gastos Diarios');
+
+  const incomeRows = data.income.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>({Fecha:x.date, Monto:x.amount, Cuenta:x.account||'Efectivo', Nota:x.note||''}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incomeRows), 'Ingresos');
+
+  const cardRows = data.cards.map(c=>({Nombre:c.name, Limite:c.limit||0, Balance:cardBalance(c), Disponible:(c.limit||0)-cardBalance(c), FechaCorte:c.cutoffDay, FechaPago:c.day}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cardRows), 'Tarjetas');
+
+  const savingsAccRows = data.savingsAccounts.map(a=>({Nombre:a.name, Balance:a.balance||0}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(savingsAccRows), 'Cuentas de Ahorro');
+
+  const goalRows = data.savings.map(g=>({Nombre:g.name, Meta:g.goal||0, Ahorrado:g.current||0}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(goalRows), 'Metas de Ahorro');
+
+  const budgetRows = Object.keys(data.budgets||{}).map(cat=>({Categoria:cat, Presupuesto:data.budgets[cat]}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(budgetRows), 'Presupuestos');
+
+  XLSX.writeFile(wb, 'synk-datos-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 function downloadBackup(){
@@ -1134,6 +1242,7 @@ function render(){
   fillAccountSelects();
   document.getElementById('currency-select').value = data.currency || 'USD';
   document.getElementById('greeting-msg').textContent = currentUserName ? ('Hola, '+currentUserName) : 'Hola';
+  document.getElementById('greeting-date').textContent = new Date().toLocaleDateString('es-PA', {day:'numeric', month:'long', year:'numeric'});
 
   const month = currentMonth();
   const dailyThisMonth = data.daily.filter(x=>x.date && x.date.slice(0,7)===month);
@@ -1149,6 +1258,7 @@ function render(){
 
   document.getElementById('stat-ingresos').textContent = money(totalIngresos);
   document.getElementById('stat-gastos').textContent = money(totalGastos);
+  document.getElementById('stat-gastos').style.color = 'var(--red)';
   document.getElementById('stat-balance').textContent = money(balance);
   document.getElementById('stat-balance').style.color = balance>=0 ? 'var(--green)' : 'var(--red)';
 
