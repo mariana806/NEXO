@@ -161,8 +161,8 @@
       <span id="greeting-date" style="font-size:12px;color:var(--muted);"></span>
     </div>
     <div class="grid2">
-      <div class="stat"><div class="label">Ingresos mensuales</div><div class="value" id="stat-ingresos">$0</div></div>
-      <div class="stat"><div class="label">Gastos mensuales</div><div class="value" id="stat-gastos">$0</div></div>
+      <div class="stat" style="cursor:pointer;" onclick="switchTab('ingresos')"><div class="label">Ingresos mensuales</div><div class="value" id="stat-ingresos">$0</div></div>
+      <div class="stat" style="cursor:pointer;background:var(--red-bg);" onclick="switchTab('diarios')"><div class="label">Gastos mensuales</div><div class="value" id="stat-gastos">$0</div></div>
     </div>
     <div class="card" style="margin-top:12px;padding:12px 16px;">
       <div class="label" style="font-size:12px;color:var(--muted);">Balance general</div>
@@ -316,27 +316,10 @@
     <div id="card-detail-content"></div>
   </div>
 
-  <div id="ajustes" class="panel">
-    <div class="card">
-      <div class="section-title" style="margin-top:0;">Moneda</div>
-      <label>¿En qué moneda quieres manejar la app?</label>
-      <select id="currency-select" onchange="setCurrency()">
-        <option value="USD">Dólares (USD)</option>
-        <option value="COP">Pesos colombianos (COP)</option>
-      </select>
-    </div>
-    <div class="card">
-      <div class="section-title" style="margin-top:0;">Categorías</div>
-      <div id="cat-tags"></div>
-      <label>Nueva categoría</label>
-      <input id="new-cat" placeholder="Ej: Educación">
-      <button onclick="addCategory()">Agregar categoría</button>
-    </div>
-    <div class="card">
-      <div class="section-title" style="margin-top:0;">Tu cuenta</div>
-      <p class="sub" id="account-email"></p>
-      <button class="secondary" onclick="handleSignOut()">Cerrar sesión</button>
-    </div>
+  <div id="cuenta-detalle" class="panel">
+    <button class="ghost" onclick="closeAccountDetail()">← Volver a Ajustes</button>
+    <h2 style="margin:10px 0 4px;">Cuenta</h2>
+    <p class="sub" id="account-email"></p>
     <div class="card">
       <div class="section-title" style="margin-top:0;">Editar nombre</div>
       <label>Nombre</label><input id="acc-firstname">
@@ -356,6 +339,32 @@
       <label>Contraseña nueva</label><input id="acc-new-password" type="password" placeholder="Mínimo 6 caracteres">
       <button onclick="updateAccountPassword()">Actualizar contraseña</button>
       <p id="acc-password-msg" style="font-size:12px;margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <button class="secondary" onclick="handleSignOut()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div id="ajustes" class="panel">
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Moneda</div>
+      <label>¿En qué moneda quieres manejar la app?</label>
+      <select id="currency-select" onchange="setCurrency()">
+        <option value="USD">Dólares (USD)</option>
+        <option value="COP">Pesos colombianos (COP)</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Categorías</div>
+      <div id="cat-tags"></div>
+      <label>Nueva categoría</label>
+      <input id="new-cat" placeholder="Ej: Educación">
+      <button onclick="addCategory()">Agregar categoría</button>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Cuenta</div>
+      <p class="sub" id="account-email-preview"></p>
+      <button onclick="openAccountDetail()">Cuenta</button>
     </div>
     <div class="card">
       <div class="section-title" style="margin-top:0;">Copia de seguridad</div>
@@ -445,11 +454,24 @@ function displayAccountInfo(email, meta){
   else if(meta && meta.full_name) name = meta.full_name;
   else if(meta && meta.name) name = meta.name;
   currentUserName = name ? name.split(' ')[0] : (email ? email.split('@')[0] : '');
-  document.getElementById('account-email').textContent = name ? (name + ' · ' + email) : email;
+  const label = name ? (name + ' · ' + email) : email;
+  if(document.getElementById('account-email')) document.getElementById('account-email').textContent = label;
+  if(document.getElementById('account-email-preview')) document.getElementById('account-email-preview').textContent = label;
   if(document.getElementById('acc-firstname')){
     document.getElementById('acc-firstname').value = (p && p.nombre) ? p.nombre : '';
     document.getElementById('acc-lastname').value = (p && p.apellido) ? p.apellido : '';
   }
+}
+function openAccountDetail(){
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.getElementById('cuenta-detalle').classList.add('active');
+}
+function closeAccountDetail(){
+  document.getElementById('cuenta-detalle').classList.remove('active');
+  document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
+  document.getElementById('ajustes').classList.add('active');
+  document.querySelector('.tab[data-tab="ajustes"]').classList.add('active');
 }
 
 async function initAuth(){
@@ -1258,7 +1280,6 @@ function render(){
 
   document.getElementById('stat-ingresos').textContent = money(totalIngresos);
   document.getElementById('stat-gastos').textContent = money(totalGastos);
-  document.getElementById('stat-gastos').style.color = 'var(--red)';
   document.getElementById('stat-balance').textContent = money(balance);
   document.getElementById('stat-balance').style.color = balance>=0 ? 'var(--green)' : 'var(--red)';
 
