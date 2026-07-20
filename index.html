@@ -335,24 +335,30 @@
     <h2 style="margin:10px 0 4px;">Cuenta</h2>
     <p class="sub" id="account-email"></p>
     <div class="card">
-      <div class="section-title" style="margin-top:0;">Editar nombre</div>
-      <label>Nombre</label><input id="acc-firstname">
-      <label>Apellido</label><input id="acc-lastname">
-      <button onclick="updateAccountName()">Guardar nombre</button>
-      <p id="acc-name-msg" style="font-size:12px;margin-top:8px;"></p>
+      <button onclick="toggleAccSection('name')">Cambiar nombre</button>
+      <div id="acc-name-fields" style="display:none;margin-top:10px;">
+        <label>Nombre</label><input id="acc-firstname">
+        <label>Apellido</label><input id="acc-lastname">
+        <button onclick="updateAccountName()">Guardar nombre</button>
+        <p id="acc-name-msg" style="font-size:12px;margin-top:8px;"></p>
+      </div>
     </div>
     <div class="card">
-      <div class="section-title" style="margin-top:0;">Cambiar correo</div>
-      <label>Nuevo correo</label><input id="acc-new-email" type="email" placeholder="nuevo@correo.com">
-      <button onclick="updateAccountEmail()">Actualizar correo</button>
-      <p id="acc-email-msg" style="font-size:12px;margin-top:8px;"></p>
+      <button onclick="toggleAccSection('email')">Cambiar correo</button>
+      <div id="acc-email-fields" style="display:none;margin-top:10px;">
+        <label>Nuevo correo</label><input id="acc-new-email" type="email" placeholder="nuevo@correo.com">
+        <button onclick="updateAccountEmail()">Actualizar correo</button>
+        <p id="acc-email-msg" style="font-size:12px;margin-top:8px;"></p>
+      </div>
     </div>
     <div class="card">
-      <div class="section-title" style="margin-top:0;">Cambiar contraseña</div>
-      <label>Contraseña actual</label><input id="acc-current-password" type="password">
-      <label>Contraseña nueva</label><input id="acc-new-password" type="password" placeholder="Mínimo 6 caracteres">
-      <button onclick="updateAccountPassword()">Actualizar contraseña</button>
-      <p id="acc-password-msg" style="font-size:12px;margin-top:8px;"></p>
+      <button onclick="toggleAccSection('password')">Cambiar contraseña</button>
+      <div id="acc-password-fields" style="display:none;margin-top:10px;">
+        <label>Contraseña actual</label><input id="acc-current-password" type="password">
+        <label>Contraseña nueva</label><input id="acc-new-password" type="password" placeholder="Mínimo 6 caracteres">
+        <button onclick="updateAccountPassword()">Actualizar contraseña</button>
+        <p id="acc-password-msg" style="font-size:12px;margin-top:8px;"></p>
+      </div>
     </div>
     <div class="card">
       <button class="secondary" onclick="handleSignOut()">Cerrar sesión</button>
@@ -750,6 +756,10 @@ function switchTab(tabName){
   if(tabEl) tabEl.classList.add('active');
 }
 
+function toggleAccSection(name){
+  const box = document.getElementById('acc-'+name+'-fields');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
 async function updateAccountName(){
   const firstName = document.getElementById('acc-firstname').value.trim();
   const lastName = document.getElementById('acc-lastname').value.trim();
