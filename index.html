@@ -394,9 +394,11 @@
     <div class="card">
       <div class="section-title" style="margin-top:0;">Reiniciar app</div>
       <p class="sub">Esto borra todos tus gastos, ingresos, tarjetas, cuentas y metas — vuelves a empezar de cero. No se puede deshacer.</p>
-      <label>Escribe tu contraseña para confirmar</label>
-      <input id="reset-password" type="password">
-      <button class="secondary" onclick="resetAppData()">Reiniciar todo</button>
+      <div id="reset-password-wrap" style="display:none;">
+        <label>Escribe tu contraseña para confirmar</label>
+        <input id="reset-password" type="password">
+      </div>
+      <button id="reset-toggle-btn" style="background:var(--red);" onclick="toggleResetForm()">Reiniciar</button>
       <p id="reset-msg" style="font-size:12px;margin-top:8px;"></p>
     </div>
   </div>
@@ -787,6 +789,15 @@ async function updateAccountPassword(){
   document.getElementById('acc-new-password').value='';
 }
 
+function toggleResetForm(){
+  const wrap = document.getElementById('reset-password-wrap');
+  const btn = document.getElementById('reset-toggle-btn');
+  if(wrap.style.display === 'none'){
+    wrap.style.display = 'block';
+    btn.textContent = 'Confirmar reinicio';
+    btn.onclick = resetAppData;
+  }
+}
 async function resetAppData(){
   const password = document.getElementById('reset-password').value;
   const msg = document.getElementById('reset-msg');
@@ -802,6 +813,10 @@ async function resetAppData(){
   data.profile = keepProfile;
   await saveData();
   document.getElementById('reset-password').value = '';
+  document.getElementById('reset-password-wrap').style.display = 'none';
+  const btn = document.getElementById('reset-toggle-btn');
+  btn.textContent = 'Reiniciar';
+  btn.onclick = toggleResetForm;
   msg.style.color='var(--green)'; msg.textContent='Listo, empezaste de cero.';
   render();
 }
