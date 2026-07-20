@@ -755,6 +755,10 @@ function deleteCategory(cat){
   saveData(); render();
 }
 
+function toggleBudgetEdit(safeId){
+  const box = document.getElementById(safeId+'-edit');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
 function setBudget(cat){
   const input = document.getElementById('budget-input-'+cat.replace(/[^a-zA-Z0-9]/g,''));
   const v = parseFloat(input.value);
@@ -1536,8 +1540,12 @@ function render(){
       '<span class="cat-pill">'+escapeHtml(cat)+'</span>'+
       '<span style="font-size:12px;color:var(--muted);">'+money(spent)+' de '+money(budget)+'</span></div>'+
       '<div class="progress-outer"><div class="progress-inner '+barClass+'" style="width:'+pct+'%;"></div></div>'+
-      '<div class="actions" style="margin-top:8px;"><input id="'+safeId+'" type="number" step="0.01" placeholder="Presupuesto" value="'+(budget||'')+'" style="width:140px;margin:0;">'+
-      '<button onclick="setBudget(\''+cat.replace(/'/g,"\\'")+'\')" style="margin:0;">Guardar</button>'+
+      '<div id="'+safeId+'-edit" style="display:none;margin-top:8px;">'+
+      '<input id="'+safeId+'" type="number" step="0.01" placeholder="Presupuesto" value="'+(budget||'')+'">'+
+      '<button onclick="setBudget(\''+cat.replace(/'/g,"\\'")+'\')" style="margin-top:6px;">Guardar</button>'+
+      '</div>'+
+      '<div class="actions" style="margin-top:8px;">'+
+      '<button class="ghost" onclick="toggleBudgetEdit(\''+safeId+'\')" style="margin:0;">Editar</button>'+
       '<button class="secondary" onclick="removeBudget(\''+cat.replace(/'/g,"\\'")+'\')">Quitar</button></div></div>';
   }).join('') : '<div class="empty">Aún no has agregado ningún presupuesto.</div>';
 
