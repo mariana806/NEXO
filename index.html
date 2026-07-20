@@ -127,6 +127,20 @@
   </div>
 </div>
 
+<div id="welcome-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:120;padding:20px;">
+  <div style="max-width:480px;width:100%;background:var(--card);color:var(--ink);border-radius:12px;padding:24px;max-height:80vh;overflow-y:auto;">
+    <h2 style="margin-top:0;font-size:18px;">¡Bienvenido a SYNK! 👋</h2>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-soft);">
+      Antes de empezar, así funciona cada parte:<br><br>
+      <strong>Tarjetas</strong> — tus tarjetas de crédito. Cada compra les suma deuda, y los pagos que hagas la bajan.<br><br>
+      <strong>Cuentas</strong> — tus cuentas de ahorro reales (banco, alcancía). Suben y bajan con lo que deposites o gastes de ahí.<br><br>
+      <strong>Metas de ahorro</strong> — no es una cuenta real, es solo un "termómetro" para una meta (ej. vacaciones), con el dinero que le vayas apartando.<br><br>
+      <strong>Gastos fijos</strong> — recuerda marcarlos como "Pagado este mes" cada mes; si no, no se descuentan de tu balance.
+    </p>
+    <button onclick="closeWelcomeModal()">Entendido</button>
+  </div>
+</div>
+
 <div id="privacy-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:120;padding:20px;">
   <div style="max-width:480px;width:100%;background:var(--card);color:var(--ink);border-radius:12px;padding:24px;max-height:80vh;overflow-y:auto;">
     <h2 style="margin-top:0;font-size:18px;">Privacidad y términos</h2>
@@ -377,6 +391,14 @@
       <p class="sub" style="margin-top:12px;">Descarga toda tu información organizada en un Excel.</p>
       <button onclick="downloadExcel()">Descargar Excel</button>
     </div>
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">Reiniciar app</div>
+      <p class="sub">Esto borra todos tus gastos, ingresos, tarjetas, cuentas y metas — vuelves a empezar de cero. No se puede deshacer.</p>
+      <label>Escribe tu contraseña para confirmar</label>
+      <input id="reset-password" type="password">
+      <button class="secondary" onclick="resetAppData()">Reiniciar todo</button>
+      <p id="reset-msg" style="font-size:12px;margin-top:8px;"></p>
+    </div>
   </div>
 
 </div>
@@ -528,6 +550,8 @@ async function handleUpdatePassword(){
 
 function openPrivacyModal(){ document.getElementById('privacy-modal').style.display = 'flex'; }
 function closePrivacyModal(){ document.getElementById('privacy-modal').style.display = 'none'; }
+function openWelcomeModal(){ document.getElementById('welcome-modal').style.display = 'flex'; }
+function closeWelcomeModal(){ document.getElementById('welcome-modal').style.display = 'none'; }
 
 async function handleSignUp(){
   const email = document.getElementById('auth-email').value.trim();
@@ -555,6 +579,7 @@ async function handleSignUp(){
   await supa.from('finanzas').insert({ id: currentUserId, data });
   displayAccountInfo(email);
   showApp();
+  openWelcomeModal();
 }
 
 async function handleSignIn(){
@@ -760,6 +785,25 @@ async function updateAccountPassword(){
   msg.style.color='var(--green)'; msg.textContent='Contraseña actualizada.';
   document.getElementById('acc-current-password').value='';
   document.getElementById('acc-new-password').value='';
+}
+
+async function resetAppData(){
+  const password = document.getElementById('reset-password').value;
+  const msg = document.getElementById('reset-msg');
+  msg.textContent = '';
+  if(!password){ msg.style.color='var(--red)'; msg.textContent='Escribe tu contraseña.'; return; }
+  const { data: sessionData } = await supa.auth.getSession();
+  const email = sessionData.session.user.email;
+  const { error } = await supa.auth.signInWithPassword({ email, password });
+  if(error){ msg.style.color='var(--red)'; msg.textContent='Contraseña incorrecta.'; return; }
+  if(!confirm('¿Seguro que quieres borrar TODA tu información y empezar de cero? No se puede deshacer.')) return;
+  const keepProfile = data.profile;
+  data = defaultData();
+  data.profile = keepProfile;
+  await saveData();
+  document.getElementById('reset-password').value = '';
+  msg.style.color='var(--green)'; msg.textContent='Listo, empezaste de cero.';
+  render();
 }
 
 function downloadExcel(){
