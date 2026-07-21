@@ -408,6 +408,16 @@
       </div>
     </div>
     <div class="card">
+      <button onclick="toggleAccSection('delete')" style="background:var(--red);">Eliminar cuenta</button>
+      <div id="acc-delete-fields" style="display:none;margin-top:10px;">
+        <p class="sub">Esto borra toda tu información financiera para siempre y cierra tu sesión. No se puede deshacer.</p>
+        <label>Escribe tu contraseña para confirmar</label>
+        <input id="acc-delete-password" type="password">
+        <button style="background:var(--red);" onclick="deleteAccountData()">Confirmar eliminación</button>
+        <p id="acc-delete-msg" style="font-size:12px;margin-top:8px;"></p>
+      </div>
+    </div>
+    <div class="card">
       <button class="secondary" onclick="handleSignOut()">Cerrar sesión</button>
     </div>
   </div>
@@ -825,6 +835,21 @@ function switchTab(tabName){
   if(tabEl) tabEl.classList.add('active');
 }
 
+async function deleteAccountData(){
+  const password = document.getElementById('acc-delete-password').value;
+  const msg = document.getElementById('acc-delete-msg');
+  msg.textContent = '';
+  if(!password){ msg.style.color='var(--red)'; msg.textContent='Escribe tu contraseña.'; return; }
+  const { data: sessionData } = await supa.auth.getSession();
+  const email = sessionData.session.user.email;
+  const { error } = await supa.auth.signInWithPassword({ email, password });
+  if(error){ msg.style.color='var(--red)'; msg.textContent='Contraseña incorrecta.'; return; }
+  if(!confirm('¿Seguro que quieres eliminar tu cuenta y TODOS tus datos? No se puede deshacer.')) return;
+  await supa.from('finanzas').delete().eq('id', currentUserId);
+  await supa.auth.signOut();
+  alert('Tu información fue eliminada. Vuelves a la pantalla de inicio.');
+  location.reload();
+}
 function toggleAccSection(name){
   const box = document.getElementById('acc-'+name+'-fields');
   box.style.display = box.style.display === 'none' ? 'block' : 'none';
