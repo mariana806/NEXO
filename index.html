@@ -789,6 +789,10 @@ function removeBudget(cat){
   delete data.budgets[cat];
   saveData(); render();
 }
+function goToNotification(tab){
+  document.getElementById('notif-panel').style.display = 'none';
+  switchTab(tab);
+}
 function toggleNotifications(){
   const panel = document.getElementById('notif-panel');
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
@@ -1575,14 +1579,14 @@ function render(){
     return '';
   }
 
-  const notifFixed = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month) && dueClass(x.day)==='due-soon').map(x=>'Gasto fijo "'+x.name+'" vence en '+(x.day-todayDay===0?'hoy':(x.day-todayDay)+' día(s)'));
-  const notifCards = data.cards.filter(c=>dueClass(c.day)==='due-soon').map(c=>'Tarjeta "'+c.name+'" se paga en '+(c.day-todayDay===0?'hoy':(c.day-todayDay)+' día(s)'));
+  const notifFixed = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month) && dueClass(x.day)==='due-soon').map(x=>({text:'Gasto fijo "'+x.name+'" vence en '+(x.day-todayDay===0?'hoy':(x.day-todayDay)+' día(s)'), tab:'fijos'}));
+  const notifCards = data.cards.filter(c=>dueClass(c.day)==='due-soon').map(c=>({text:'Tarjeta "'+c.name+'" se paga en '+(c.day-todayDay===0?'hoy':(c.day-todayDay)+' día(s)'), tab:'tarjetas'}));
   const notifs = [...notifFixed, ...notifCards];
   const badge = document.getElementById('notif-badge');
   if(notifs.length){ badge.style.display='inline-block'; badge.textContent = notifs.length; }
   else{ badge.style.display='none'; }
   document.getElementById('notif-list').innerHTML = notifs.length
-    ? notifs.map(n=>'<div class="row" style="margin-bottom:6px;"><div class="info"><div class="meta">'+escapeHtml(n)+'</div></div></div>').join('')
+    ? notifs.map(n=>'<div class="row" style="margin-bottom:6px;cursor:pointer;" onclick="goToNotification(\''+n.tab+'\')"><div class="info"><div class="meta">'+escapeHtml(n.text)+'</div></div></div>').join('')
     : '<div class="empty">No tienes pagos por vencer.</div>';
 
   document.getElementById('accounts-summary').innerHTML = data.savingsAccounts.length ?
