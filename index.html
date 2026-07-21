@@ -154,7 +154,17 @@
 
 <div id="app-content">
 <div class="app">
-  <h1>SYNK</h1>
+  <div style="display:flex;justify-content:space-between;align-items:center;position:relative;">
+    <h1 style="margin:0;">SYNK</h1>
+    <div style="position:relative;">
+      <button class="ghost" onclick="toggleNotifications()" style="margin:0;font-size:18px;padding:8px 10px;position:relative;">🔔
+        <span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;">0</span>
+      </button>
+      <div id="notif-panel" style="display:none;position:absolute;right:0;top:44px;width:280px;max-height:340px;overflow-y:auto;background:var(--card);border:1px solid var(--paper-line);border-radius:10px;padding:10px;z-index:60;">
+        <div id="notif-list"></div>
+      </div>
+    </div>
+  </div>
 
   <div class="tabs">
     <div class="tab active" data-tab="resumen">Resumen</div>
@@ -777,6 +787,10 @@ function addBudget(){
 function removeBudget(cat){
   delete data.budgets[cat];
   saveData(); render();
+}
+function toggleNotifications(){
+  const panel = document.getElementById('notif-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 }
 function switchTab(tabName){
   document.querySelectorAll('.tabs .tab[data-tab]').forEach(x=>x.classList.remove('active'));
@@ -1559,6 +1573,17 @@ function render(){
     if(diff <= 3) return 'due-soon';
     return '';
   }
+
+  const notifFixed = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month) && dueClass(x.day)==='due-soon').map(x=>'Gasto fijo "'+x.name+'" vence en '+(x.day-todayDay===0?'hoy':(x.day-todayDay)+' día(s)'));
+  const notifCards = data.cards.filter(c=>dueClass(c.day)==='due-soon').map(c=>'Tarjeta "'+c.name+'" se paga en '+(c.day-todayDay===0?'hoy':(c.day-todayDay)+' día(s)'));
+  const notifs = [...notifFixed, ...notifCards];
+  const badge = document.getElementById('notif-badge');
+  if(notifs.length){ badge.style.display='inline-block'; badge.textContent = notifs.length; }
+  else{ badge.style.display='none'; }
+  document.getElementById('notif-list').innerHTML = notifs.length
+    ? notifs.map(n=>'<div class="row" style="margin-bottom:6px;"><div class="info"><div class="meta">'+escapeHtml(n)+'</div></div></div>').join('')
+    : '<div class="empty">No tienes pagos por vencer.</div>';
+
   document.getElementById('accounts-summary').innerHTML = data.savingsAccounts.length ?
     '<div class="card" style="cursor:pointer;" onclick="switchTab(\'cuentas-ahorro\')">'+
     '<div class="label" style="font-size:12px;color:var(--muted);">Balance</div>'+
