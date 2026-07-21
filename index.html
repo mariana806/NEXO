@@ -127,6 +127,14 @@
   </div>
 </div>
 
+<div id="update-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:126;padding:20px;">
+  <div style="max-width:420px;width:100%;background:var(--card);color:var(--ink);border-radius:12px;padding:24px;">
+    <h2 style="margin-top:0;font-size:18px;">✨ Novedades en SYNK</h2>
+    <p id="update-modal-text" style="font-size:13px;line-height:1.6;color:var(--ink-soft);"></p>
+    <button onclick="closeUpdateModal()">Entendido</button>
+  </div>
+</div>
+
 <div id="forgot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:125;padding:20px;">
   <div style="max-width:340px;width:100%;background:var(--card);color:var(--ink);border-radius:12px;padding:24px;">
     <h2 style="margin-top:0;font-size:18px;">Recuperar contraseña</h2>
@@ -491,13 +499,15 @@
 </div>
 
 <script>
+const APP_VERSION = '1.0';
+const WHATS_NEW_TEXT = 'Agregamos Inversiones, Suscripciones, notificaciones de pagos próximos a vencer, y varias mejoras más.';
 const SUPABASE_URL = 'https://nalmayvmhqhvqjbudvhs.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FJRYij_qsHEftI5AyEPIuw_3m7gH6m8';
 const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DEFAULT_CATS = ['Comida','Transporte','Servicios','Salud','Vivienda','Otros'];
 function defaultData(){
-  return { fixed: [], daily: [], income: [], savings: [], cards: [], savingsAccounts: [], investments: [], subscriptions: [], budgets: {}, categories: DEFAULT_CATS.slice(), currency: 'USD' };
+  return { fixed: [], daily: [], income: [], savings: [], cards: [], savingsAccounts: [], investments: [], subscriptions: [], budgets: {}, categories: DEFAULT_CATS.slice(), currency: 'USD', lastSeenVersion: APP_VERSION };
 }
 let data = defaultData();
 let currentUserId = null;
@@ -597,6 +607,7 @@ async function initAuth(){
     await loadUserData();
     displayAccountInfo(sessionData.session.user.email, sessionData.session.user.user_metadata);
     showApp();
+    checkForUpdates();
   }else{
     document.getElementById('auth-screen').style.display = 'flex';
   }
@@ -642,6 +653,17 @@ async function handleUpdatePassword(){
   await initAuth();
 }
 
+function checkForUpdates(){
+  if(data.lastSeenVersion !== APP_VERSION){
+    document.getElementById('update-modal-text').textContent = WHATS_NEW_TEXT;
+    document.getElementById('update-modal').style.display = 'flex';
+  }
+}
+function closeUpdateModal(){
+  document.getElementById('update-modal').style.display = 'none';
+  data.lastSeenVersion = APP_VERSION;
+  saveData();
+}
 function openPrivacyModal(){ document.getElementById('privacy-modal').style.display = 'flex'; }
 function closePrivacyModal(){ document.getElementById('privacy-modal').style.display = 'none'; }
 function openWelcomeModal(){ document.getElementById('welcome-modal').style.display = 'flex'; }
@@ -687,6 +709,7 @@ async function handleSignIn(){
   await loadUserData();
   displayAccountInfo(email, signInData.user.user_metadata);
   showApp();
+  checkForUpdates();
 }
 
 async function handleSignOut(){
@@ -722,6 +745,7 @@ async function loadUserData(){
     if(!data.investments) data.investments = [];
     data.investments.forEach(x=>{ if(!x.movements) x.movements = []; });
     if(!data.subscriptions) data.subscriptions = [];
+    if(data.lastSeenVersion === undefined) data.lastSeenVersion = '';
     data.savings.forEach(x=>{ if(!x.movements) x.movements = []; });
     data.savingsAccounts.forEach(x=>{
       if(!x.movements) x.movements = [];
