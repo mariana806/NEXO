@@ -189,6 +189,7 @@
     <div class="tab" data-tab="cuentas-ahorro">Cuentas</div>
     <div class="tab" data-tab="tarjetas">Tarjetas</div>
     <div class="tab" data-tab="inversiones">Inversiones</div>
+    <div class="tab" data-tab="suscripciones">Suscripciones</div>
     <div class="tab" data-tab="presupuestos">Presupuestos</div>
     <div class="tab" data-tab="ajustes">Ajustes</div>
   </div>
@@ -377,6 +378,24 @@
     <div id="investment-detail-content"></div>
   </div>
 
+  <div id="suscripciones" class="panel">
+    <div class="card">
+      <div class="grid2">
+        <div><label>Nombre</label><input id="sub-name" placeholder="Netflix, Spotify..."></div>
+        <div><label>Monto</label><input id="sub-amount" type="number" step="0.01" placeholder="0"></div>
+      </div>
+      <label>Fecha de renovación</label><input id="sub-day" type="date">
+      <p class="sub" style="margin:2px 0 0;">(solo se usa el día del mes)</p>
+      <label>Método de pago</label><select id="sub-account"></select>
+      <div class="actions">
+        <button id="sub-submit" onclick="submitSubscription()">Agregar suscripción</button>
+        <button class="ghost" id="sub-cancel" style="display:none;" onclick="cancelEditSubscription()">Cancelar</button>
+      </div>
+    </div>
+    <div class="section-title">Detalle de suscripciones</div>
+    <div id="subscriptions-list"></div>
+  </div>
+
   <div id="cuenta-detalle" class="panel">
     <button class="ghost" onclick="closeAccountDetail()">← Volver a Ajustes</button>
     <h2 style="margin:10px 0 4px;">Cuenta</h2>
@@ -478,7 +497,7 @@ const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DEFAULT_CATS = ['Comida','Transporte','Servicios','Salud','Vivienda','Otros'];
 function defaultData(){
-  return { fixed: [], daily: [], income: [], savings: [], cards: [], savingsAccounts: [], investments: [], budgets: {}, categories: DEFAULT_CATS.slice(), currency: 'USD' };
+  return { fixed: [], daily: [], income: [], savings: [], cards: [], savingsAccounts: [], investments: [], subscriptions: [], budgets: {}, categories: DEFAULT_CATS.slice(), currency: 'USD' };
 }
 let data = defaultData();
 let currentUserId = null;
@@ -702,6 +721,7 @@ async function loadUserData(){
     if(!data.savingsAccounts) data.savingsAccounts = [];
     if(!data.investments) data.investments = [];
     data.investments.forEach(x=>{ if(!x.movements) x.movements = []; });
+    if(!data.subscriptions) data.subscriptions = [];
     data.savings.forEach(x=>{ if(!x.movements) x.movements = []; });
     data.savingsAccounts.forEach(x=>{
       if(!x.movements) x.movements = [];
@@ -775,7 +795,7 @@ function buildSavingsAccountOptions(){
 }
 function fillAccountSelects(){
   const options = buildAccountOptions();
-  ['i-account','d-account','f-account','inv-account'].forEach(id=>{
+  ['i-account','d-account','f-account','inv-account','sub-account'].forEach(id=>{
     const sel = document.getElementById(id);
     const current = sel.value;
     sel.innerHTML = options;
@@ -1357,6 +1377,71 @@ function closeInvestmentDetail(){
   document.querySelector('.tab[data-tab="inversiones"]').classList.add('active');
 }
 
+let editingSubscriptionId = null;
+function submitSubscription(){
+  const name=document.getElementById('sub-name').value.trim();
+  const amount=parseFloat(document.getElementById('sub-amount').value);
+  const dayValue=document.getElementById('sub-day').value;
+  const day=dayValue ? parseInt(dayValue.split('-')[2]) : 1;
+  const account=document.getElementById('sub-account').value;
+  if(!name||!amount) return;
+  if(editingSubscriptionId){
+    const it = data.subscriptions.find(x=>x.id===editingSubscriptionId);
+    Object.assign(it, {name, amount, day: day||1, account});
+    cancelEditSubscription();
+  }else{
+    data.subscriptions.push({id:uid(), name, amount, day: day||1, account, paidMonths:[]});
+  }
+  document.getElementById('sub-name').value='';
+  document.getElementById('sub-amount').value='';
+  document.getElementById('sub-day').value='';
+  saveData(); render();
+}
+function editSubscription(id){
+  const it = data.subscriptions.find(x=>x.id===id); if(!it) return;
+  editingSubscriptionId = id;
+  document.getElementById('sub-name').value = it.name;
+  document.getElementById('sub-amount').value = it.amount;
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dd = String(it.day||1).padStart(2,'0');
+  document.getElementById('sub-day').value = yyyy+'-'+mm+'-'+dd;
+  document.getElementById('sub-account').value = it.account || 'Efectivo';
+  document.getElementById('sub-submit').textContent = 'Guardar cambios';
+  document.getElementById('sub-cancel').style.display = 'inline-block';
+  document.getElementById('suscripciones').scrollIntoView({behavior:'smooth'});
+}
+function cancelEditSubscription(){
+  editingSubscriptionId = null;
+  document.getElementById('sub-submit').textContent = 'Agregar suscripción';
+  document.getElementById('sub-cancel').style.display = 'none';
+}
+function toggleSubscriptionPaid(id){
+  const it = data.subscriptions.find(x=>x.id===id); if(!it) return;
+  if(!it.paidMonths) it.paidMonths = [];
+  const m = currentMonth();
+  if(it.paidMonths.includes(m)){
+    it.paidMonths = it.paidMonths.filter(x=>x!==m);
+    chargeAccount(it.account, -it.amount);
+  }else{
+    it.paidMonths.push(m);
+    chargeAccount(it.account, it.amount);
+  }
+  saveData(); render();
+}
+function deleteSubscription(id){
+  if(!confirm('¿Borrar esta suscripción?')) return;
+  const it = data.subscriptions.find(x=>x.id===id);
+  if(it && it.paidMonths && it.paidMonths.length) chargeAccount(it.account, -(it.paidMonths.length * it.amount));
+  data.subscriptions = data.subscriptions.filter(x=>x.id!==id);
+  saveData(); render();
+}
+function paySubscriptionFromResumen(id){
+  toggleSubscriptionPaid(id);
+  switchTab('suscripciones');
+}
+
 function addSaving(){
   const name=document.getElementById('s-name').value.trim();
   const goal=parseFloat(document.getElementById('s-goal').value)||0;
@@ -1566,7 +1651,8 @@ function render(){
 
   const totalDaily = dailyThisMonth.reduce((s,x)=>s+x.amount,0);
   const totalFixed = data.fixed.filter(x=>(x.paidMonths||[]).includes(month)).reduce((s,x)=>s+x.amount,0);
-  const totalGastos = totalDaily + totalFixed;
+  const totalSubs = data.subscriptions.filter(x=>(x.paidMonths||[]).includes(month)).reduce((s,x)=>s+x.amount,0);
+  const totalGastos = totalDaily + totalFixed + totalSubs;
   const totalIngresos = incomeThisMonth.reduce((s,x)=>s+x.amount,0);
   const totalSavingsAccountBalance = data.savingsAccounts.reduce((s,a)=>s+(a.balance||0),0);
   const totalAhorradoMetas = data.savings.reduce((s,g)=>s+(g.current||0),0);
@@ -1626,7 +1712,8 @@ function render(){
 
   const notifFixed = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month) && dueClass(x.day)==='due-soon').map(x=>({text:'Gasto fijo "'+x.name+'" vence en '+(x.day-todayDay===0?'hoy':(x.day-todayDay)+' día(s)'), tab:'fijos'}));
   const notifCards = data.cards.filter(c=>dueClass(c.day)==='due-soon').map(c=>({text:'Tarjeta "'+c.name+'" se paga en '+(c.day-todayDay===0?'hoy':(c.day-todayDay)+' día(s)'), tab:'tarjetas'}));
-  const notifs = [...notifFixed, ...notifCards];
+  const notifSubs = data.subscriptions.filter(x=>!(x.paidMonths||[]).includes(month) && dueClass(x.day)==='due-soon').map(x=>({text:'Suscripción "'+x.name+'" se renueva en '+(x.day-todayDay===0?'hoy':(x.day-todayDay)+' día(s)'), tab:'suscripciones'}));
+  const notifs = [...notifFixed, ...notifCards, ...notifSubs];
   const badge = document.getElementById('notif-badge');
   if(notifs.length){ badge.style.display='inline-block'; badge.textContent = notifs.length; }
   else{ badge.style.display='none'; }
@@ -1657,10 +1744,13 @@ function render(){
     '</div></div>' : '<div class="empty">Aún no tienes inversiones registradas.</div>';
 
   const pendList = document.getElementById('pendientes-list');
-  const pendItems = data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({id:x.id, name:x.name, amount:x.amount, day:x.day, type:'fijo'})).sort((a,b)=>a.day-b.day);
+  const pendItems = [
+    ...data.fixed.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({id:x.id, name:x.name, amount:x.amount, day:x.day, type:'fijo'})),
+    ...data.subscriptions.filter(x=>!(x.paidMonths||[]).includes(month)).map(x=>({id:x.id, name:x.name, amount:x.amount, day:x.day, type:'suscripcion'}))
+  ].sort((a,b)=>a.day-b.day);
   pendList.innerHTML = pendItems.length ? pendItems.map(x=>
-    '<div class="row '+dueClass(x.day)+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+(dueClass(x.day)==='overdue'?' · atrasado':dueClass(x.day)==='due-soon'?' · vence pronto':'')+'</div></div>'+
-    '<div class="actions"><div class="amount">'+money(x.amount)+'</div><button onclick="payFixedFromResumen(\''+x.id+'\')" style="margin:0;">Pagar</button></div></div>'
+    '<div class="row '+dueClass(x.day)+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Vence día '+x.day+(dueClass(x.day)==='overdue'?' · atrasado':dueClass(x.day)==='due-soon'?' · vence pronto':'')+(x.type==='suscripcion'?' · suscripción':'')+'</div></div>'+
+    '<div class="actions"><div class="amount">'+money(x.amount)+'</div><button onclick="'+(x.type==='suscripcion'?'paySubscriptionFromResumen':'payFixedFromResumen')+'(\''+x.id+'\')" style="margin:0;">Pagar</button></div></div>'
   ).join('') : '<div class="empty">No hay pagos pendientes.</div>';
 
   const totalCardBalance = data.cards.reduce((s,c)=>s+cardBalance(c),0);
@@ -1762,6 +1852,16 @@ function render(){
     '<button class="ghost" onclick="event.stopPropagation();editInvestment(\''+x.id+'\')">Editar</button>'+
     '<button class="secondary" onclick="event.stopPropagation();deleteInvestment(\''+x.id+'\')">Borrar</button></div></div>';
   }).join('') : '<div class="empty">Aún no hay inversiones registradas.</div>';
+
+  document.getElementById('subscriptions-list').innerHTML = data.subscriptions.length ? data.subscriptions.slice().sort((a,b)=>a.day-b.day).map(x=>{
+    const isPaid = (x.paidMonths||[]).includes(month);
+    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Renueva día '+x.day+' · '+escapeHtml(x.account||'Efectivo')+'</div></div>'+
+    '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
+    (isPaid?'<span class="stamp">Pagado</span>':'')+
+    '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(isPaid?'checked':'')+' onchange="toggleSubscriptionPaid(\''+x.id+'\')">Pagado este mes</label>'+
+    '<button class="ghost" onclick="editSubscription(\''+x.id+'\')">Editar</button>'+
+    '<button class="secondary" onclick="deleteSubscription(\''+x.id+'\')">Borrar</button></div></div>';
+  }).join('') : '<div class="empty">Aún no hay suscripciones.</div>';
 
   document.getElementById('cat-tags').innerHTML = data.categories.map(c=>
     '<span class="cat-tag">'+escapeHtml(c)+'<button onclick="deleteCategory(\''+c.replace(/'/g,"\\'")+'\')">✕</button></span>'
