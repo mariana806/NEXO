@@ -107,7 +107,7 @@
     </div>
     <button style="width:100%;" id="auth-submit-btn" onclick="handleAuthSubmit()">Iniciar sesión</button>
     <button class="google" style="width:100%;" onclick="handleGoogleSignIn()">Continuar con Google</button>
-    <p id="forgot-link" style="font-size:12px;margin-top:10px;cursor:pointer;color:var(--ink-soft);text-decoration:underline;" onclick="handleForgotPassword()">¿Olvidaste tu contraseña?</p>
+    <p id="forgot-link" style="font-size:12px;margin-top:10px;cursor:pointer;color:var(--ink-soft);text-decoration:underline;" onclick="openForgotModal()">¿Olvidaste tu contraseña?</p>
     <p id="auth-error" style="color:var(--red);font-size:12px;margin-top:8px;"></p>
     <p id="auth-info" style="color:var(--green);font-size:12px;margin-top:8px;"></p>
     <p style="font-size:11px;margin-top:14px;color:var(--muted);cursor:pointer;text-decoration:underline;" onclick="openPrivacyModal()">Privacidad y términos</p>
@@ -124,6 +124,18 @@
     </div>
     <button style="width:100%;" onclick="handleUpdatePassword()">Guardar nueva contraseña</button>
     <p id="recovery-error" style="color:var(--red);font-size:12px;margin-top:8px;"></p>
+  </div>
+</div>
+
+<div id="forgot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:125;padding:20px;">
+  <div style="max-width:340px;width:100%;background:var(--card);color:var(--ink);border-radius:12px;padding:24px;">
+    <h2 style="margin-top:0;font-size:18px;">Recuperar contraseña</h2>
+    <p class="sub">Escribe tu correo y te enviamos un link para crear una nueva contraseña.</p>
+    <label>Correo</label>
+    <input id="forgot-email" type="email" placeholder="tu@correo.com">
+    <button onclick="handleForgotPassword()">Enviar correo</button>
+    <button class="ghost" onclick="closeForgotModal()">Cancelar</button>
+    <p id="forgot-msg" style="font-size:12px;margin-top:8px;"></p>
   </div>
 </div>
 
@@ -565,15 +577,23 @@ async function handleGoogleSignIn(){
   await supa.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
 }
 
+function openForgotModal(){
+  document.getElementById('forgot-msg').textContent = '';
+  document.getElementById('forgot-email').value = '';
+  document.getElementById('forgot-modal').style.display = 'flex';
+}
+function closeForgotModal(){
+  document.getElementById('forgot-modal').style.display = 'none';
+}
 async function handleForgotPassword(){
-  const email = document.getElementById('auth-email').value.trim();
-  const err = document.getElementById('auth-error');
-  const info = document.getElementById('auth-info');
-  err.textContent = ''; info.textContent = '';
-  if(!email){ err.textContent = 'Escribe tu correo arriba primero.'; return; }
+  const email = document.getElementById('forgot-email').value.trim();
+  const msg = document.getElementById('forgot-msg');
+  msg.textContent = '';
+  if(!email){ msg.style.color='var(--red)'; msg.textContent = 'Escribe tu correo.'; return; }
   const { error } = await supa.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
-  if(error){ err.textContent = error.message; return; }
-  info.textContent = 'Te enviamos un correo con un link para crear una nueva contraseña.';
+  if(error){ msg.style.color='var(--red)'; msg.textContent = error.message; return; }
+  msg.style.color='var(--green)';
+  msg.textContent = 'Listo, revisa tu correo — te enviamos un link para crear una nueva contraseña.';
 }
 
 function toggleRecoveryVisibility(){
