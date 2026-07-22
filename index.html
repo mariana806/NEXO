@@ -392,8 +392,19 @@
         <div><label>Nombre</label><input id="sub-name" placeholder="Netflix, Spotify..."></div>
         <div><label>Monto</label><input id="sub-amount" type="number" step="0.01" placeholder="0"></div>
       </div>
+      <label>Frecuencia de pago</label>
+      <select id="sub-frequency">
+        <option value="Mensual">Mensual</option>
+        <option value="Trimestral">Trimestral</option>
+        <option value="Semestral">Semestral</option>
+        <option value="Anual">Anual</option>
+      </select>
       <label>Fecha de renovación</label><input id="sub-day" type="date">
       <p class="sub" style="margin:2px 0 0;">(solo se usa el día del mes)</p>
+      <div class="grid2">
+        <div><label>Fecha de inicio</label><input id="sub-start" type="date"></div>
+        <div><label>Fecha de fin (opcional)</label><input id="sub-end" type="date"></div>
+      </div>
       <label>Método de pago</label><select id="sub-account"></select>
       <div class="actions">
         <button id="sub-submit" onclick="submitSubscription()">Agregar suscripción</button>
@@ -745,6 +756,7 @@ async function loadUserData(){
     if(!data.investments) data.investments = [];
     data.investments.forEach(x=>{ if(!x.movements) x.movements = []; });
     if(!data.subscriptions) data.subscriptions = [];
+    data.subscriptions.forEach(x=>{ if(!x.frequency) x.frequency = 'Mensual'; });
     if(data.lastSeenVersion === undefined) data.lastSeenVersion = '';
     data.savings.forEach(x=>{ if(!x.movements) x.movements = []; });
     data.savingsAccounts.forEach(x=>{
@@ -1405,20 +1417,25 @@ let editingSubscriptionId = null;
 function submitSubscription(){
   const name=document.getElementById('sub-name').value.trim();
   const amount=parseFloat(document.getElementById('sub-amount').value);
+  const frequency=document.getElementById('sub-frequency').value;
   const dayValue=document.getElementById('sub-day').value;
   const day=dayValue ? parseInt(dayValue.split('-')[2]) : 1;
+  const startDate=document.getElementById('sub-start').value;
+  const endDate=document.getElementById('sub-end').value;
   const account=document.getElementById('sub-account').value;
   if(!name||!amount) return;
   if(editingSubscriptionId){
     const it = data.subscriptions.find(x=>x.id===editingSubscriptionId);
-    Object.assign(it, {name, amount, day: day||1, account});
+    Object.assign(it, {name, amount, frequency, day: day||1, startDate, endDate, account});
     cancelEditSubscription();
   }else{
-    data.subscriptions.push({id:uid(), name, amount, day: day||1, account, paidMonths:[]});
+    data.subscriptions.push({id:uid(), name, amount, frequency, day: day||1, startDate, endDate, account, paidMonths:[]});
   }
   document.getElementById('sub-name').value='';
   document.getElementById('sub-amount').value='';
   document.getElementById('sub-day').value='';
+  document.getElementById('sub-start').value='';
+  document.getElementById('sub-end').value='';
   saveData(); render();
 }
 function editSubscription(id){
@@ -1426,11 +1443,14 @@ function editSubscription(id){
   editingSubscriptionId = id;
   document.getElementById('sub-name').value = it.name;
   document.getElementById('sub-amount').value = it.amount;
+  document.getElementById('sub-frequency').value = it.frequency || 'Mensual';
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth()+1).padStart(2,'0');
   const dd = String(it.day||1).padStart(2,'0');
   document.getElementById('sub-day').value = yyyy+'-'+mm+'-'+dd;
+  document.getElementById('sub-start').value = it.startDate || '';
+  document.getElementById('sub-end').value = it.endDate || '';
   document.getElementById('sub-account').value = it.account || 'Efectivo';
   document.getElementById('sub-submit').textContent = 'Guardar cambios';
   document.getElementById('sub-cancel').style.display = 'inline-block';
@@ -1879,7 +1899,8 @@ function render(){
 
   document.getElementById('subscriptions-list').innerHTML = data.subscriptions.length ? data.subscriptions.slice().sort((a,b)=>a.day-b.day).map(x=>{
     const isPaid = (x.paidMonths||[]).includes(month);
-    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">Renueva día '+x.day+' · '+escapeHtml(x.account||'Efectivo')+'</div></div>'+
+    const fechas = (x.startDate?('Desde '+x.startDate):'') + (x.endDate?(' hasta '+x.endDate):(x.startDate?' · sin fecha de fin':''));
+    return '<div class="row '+(isPaid?'paid':dueClass(x.day))+'"><div class="info"><div class="name">'+escapeHtml(x.name)+'</div><div class="meta">'+(x.frequency||'Mensual')+' · Renueva día '+x.day+' · '+escapeHtml(x.account||'Efectivo')+(fechas?' · '+fechas:'')+'</div></div>'+
     '<div class="actions"><div class="amount">'+money(x.amount)+'</div>'+
     (isPaid?'<span class="stamp">Pagado</span>':'')+
     '<label style="display:flex;align-items:center;gap:4px;margin:0;font-size:11px;"><input type="checkbox" '+(isPaid?'checked':'')+' onchange="toggleSubscriptionPaid(\''+x.id+'\')">Pagado este mes</label>'+
